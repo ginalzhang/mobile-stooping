@@ -5,6 +5,7 @@ import {
   FlatList,
   Image,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -41,6 +42,7 @@ export function ShopScreen({ navigation }: Props) {
   const [sort, setSort] = useState<ProductSort>("RECENTLY_ADDED");
   const [inStockOnly, setInStockOnly] = useState(true);
   const [strollIndex, setStrollIndex] = useState(0);
+  const [strolledIds, setStrolledIds] = useState<string[]>([]);
 
   const filters = { category, inStockOnly, search, sort };
   const productsQuery = useInfiniteQuery({
@@ -61,7 +63,23 @@ export function ShopScreen({ navigation }: Props) {
   const usingCachedInventory = Boolean(
     productsQuery.data?.pages.some((page) => page.source === "cache")
   );
-  const strollProduct = products[strollIndex % Math.max(products.length, 1)];
+  const availableStrollProducts = useMemo(
+    () => products.filter((product) => product.availableForSale && product.stockCount > 0),
+    [products]
+  );
+  const strollProduct =
+    availableStrollProducts[strollIndex % Math.max(availableStrollProducts.length, 1)];
+  const strolledAllItems =
+    mode === "Stroll" &&
+    availableStrollProducts.length > 0 &&
+    strolledIds.length >= availableStrollProducts.length;
+  const refreshControl = (
+    <RefreshControl
+      refreshing={productsQuery.isRefetching}
+      onRefresh={() => void productsQuery.refetch()}
+      tintColor={colors.forest}
+    />
+  );
 
   const openProduct = (product: Product) => {
     navigation.navigate("ProductDetail", {
@@ -169,10 +187,26 @@ export function ShopScreen({ navigation }: Props) {
     return (
       <Screen>
         {header}
-        {strollProduct ? (
+        {strolledAllItems ? (
+          <StateView
+            title="You strolled the whole block"
+            message="Stoopy showed every available find in this view. New drops land before Sunday pickup."
+            actionLabel="Start over"
+            onAction={() => {
+              setStrolledIds([]);
+              setStrollIndex(0);
+            }}
+            showMascot
+          />
+        ) : strollProduct ? (
           <StrollCard
             product={strollProduct}
-            onNext={() => setStrollIndex((index) => index + 1)}
+            onNext={() => {
+              setStrolledIds((ids) =>
+                ids.includes(strollProduct.id) ? ids : [...ids, strollProduct.id]
+              );
+              setStrollIndex((index) => index + 1);
+            }}
             onPress={() => openProduct(strollProduct)}
           />
         ) : (
@@ -201,6 +235,7 @@ export function ShopScreen({ navigation }: Props) {
         numColumns={2}
         columnWrapperStyle={styles.gridRow}
         contentContainerStyle={styles.list}
+        refreshControl={refreshControl}
         onEndReached={() => {
           if (productsQuery.hasNextPage && !productsQuery.isFetchingNextPage) {
             void productsQuery.fetchNextPage();
