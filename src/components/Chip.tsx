@@ -25,7 +25,7 @@ export function Chip({ label, selected, onPress }: ChipProps) {
 
 const styles = StyleSheet.create({
   chip: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.paper2,
     borderColor: colors.border,
     borderRadius: 999,
     borderWidth: 1,

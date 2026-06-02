@@ -1,59 +1,53 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View
 } from "react-native";
 
-import { fetchCollectionDetails, fetchProducts } from "../../api/shopify";
+import { fetchProducts } from "../../api/shopify";
 import { AppButton } from "../../components/AppButton";
 import { BrandLogo } from "../../components/BrandLogo";
-import { Chip } from "../../components/Chip";
 import { ProductCard } from "../../components/ProductCard";
 import { Screen } from "../../components/Screen";
 import { StateView } from "../../components/StateView";
 import { StoopyMascot } from "../../components/StoopyMascot";
+import { useCart } from "../cart/CartContext";
+import type { ShopStackParamList } from "../../navigation/types";
 import { colors } from "../../theme/colors";
 import { spacing, typography } from "../../theme/theme";
-import type { Product, ProductSort } from "../../types/product";
-import type { ShopStackParamList } from "../../navigation/types";
+import type { Product } from "../../types/product";
 
 type Props = NativeStackScreenProps<ShopStackParamList, "ShopHome">;
 type BrowseMode = "Grid" | "Collections" | "Stroll";
 
-const sortOptions: { label: string; value: ProductSort }[] = [
-  { label: "Recently added", value: "RECENTLY_ADDED" },
-  { label: "Popular", value: "POPULAR" },
-  { label: "A-Z", value: "TITLE_ASC" },
-  { label: "Earlier", value: "EARLIER_LISTINGS" }
-];
+const modes: BrowseMode[] = ["Grid", "Collections", "Stroll"];
 
 export function ShopScreen({ navigation }: Props) {
   const [mode, setMode] = useState<BrowseMode>("Grid");
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<string | undefined>();
-  const [sort, setSort] = useState<ProductSort>("RECENTLY_ADDED");
-  const [inStockOnly, setInStockOnly] = useState(true);
   const [strollIndex, setStrollIndex] = useState(0);
   const [strolledIds, setStrolledIds] = useState<string[]>([]);
+  const { addItem, items } = useCart();
 
-  const filters = { category, inStockOnly, search, sort };
+  const filters = useMemo(
+    () => ({ inStockOnly: true, search, sort: "RECENTLY_ADDED" as const }),
+    [search]
+  );
   const productsQuery = useInfiniteQuery({
     queryKey: ["products", filters],
     queryFn: ({ pageParam }) => fetchProducts({ ...filters, cursor: pageParam }),
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: null as string | null
-  });
-  const collectionsQuery = useQuery({
-    queryKey: ["collections"],
-    queryFn: () => fetchCollectionDetails()
   });
 
   const products = useMemo(
@@ -63,16 +57,17 @@ export function ShopScreen({ navigation }: Props) {
   const usingCachedInventory = Boolean(
     productsQuery.data?.pages.some((page) => page.source === "cache")
   );
-  const availableStrollProducts = useMemo(
+  const availableProducts = useMemo(
     () => products.filter((product) => product.availableForSale && product.stockCount > 0),
     [products]
   );
+  const collectionGroups = useMemo(() => groupProductsByCategory(products), [products]);
   const strollProduct =
-    availableStrollProducts[strollIndex % Math.max(availableStrollProducts.length, 1)];
+    availableProducts[strollIndex % Math.max(availableProducts.length, 1)];
   const strolledAllItems =
     mode === "Stroll" &&
-    availableStrollProducts.length > 0 &&
-    strolledIds.length >= availableStrollProducts.length;
+    availableProducts.length > 0 &&
+    strolledIds.length >= availableProducts.length;
   const refreshControl = (
     <RefreshControl
       refreshing={productsQuery.isRefetching}
@@ -88,73 +83,53 @@ export function ShopScreen({ navigation }: Props) {
     });
   };
 
+  const isInOrder = (product: Product) =>
+    items.some((item) => item.product.variantId === product.variantId);
+
+  const addProduct = (product: Product) => {
+    const result = addItem(product);
+    if (!result.ok) {
+      Alert.alert("Could not add item", result.message ?? "Try another find.");
+    }
+  };
+
   const header = (
     <View style={styles.header}>
-      <BrandLogo size="medium" />
-      {usingCachedInventory ? (
+      <View style={styles.brandRow}>
+        <BrandLogo size="medium" />
+        {usingCachedInventory ? (
+          <View style={styles.offlinePill}>
+            <Text style={styles.offlinePillText}>Offline</Text>
+          </View>
+        ) : null}
+      </View>
+      {mode !== "Stroll" ? (
+        <>
+          <Text style={typography.h1}>Free treasures, ready{"\n"}for a good home</Text>
+          <Text style={styles.subhead}>
+            {availableProducts.length} finds available · hot items move fast
+          </Text>
+        </>
+      ) : null}
+      <ModeSegment mode={mode} onChange={setMode} />
+      {mode !== "Stroll" ? (
+        <TextInput
+          accessibilityLabel="Search inventory"
+          autoCapitalize="none"
+          onChangeText={setSearch}
+          placeholder="Search inventory"
+          placeholderTextColor={colors.muted}
+          style={styles.search}
+          value={search}
+        />
+      ) : null}
+      {usingCachedInventory && mode !== "Stroll" ? (
         <View style={styles.offlineBanner}>
-          <Text style={styles.offlineTitle}>Offline mode</Text>
+          <Text style={styles.offlineTitle}>Showing saved inventory</Text>
           <Text style={styles.offlineText}>
-            Showing the last inventory we loaded. Pull back online before checkout.
+            Pull back online before checkout so stock can be rechecked.
           </Text>
         </View>
-      ) : null}
-      <Text style={typography.h1}>Free treasures, ready for a good home</Text>
-      <Text style={styles.subhead}>Hot items move fast. Everything is $0.</Text>
-      <View style={styles.modeRow}>
-        {(["Grid", "Collections", "Stroll"] as BrowseMode[]).map((option) => (
-          <Chip
-            key={option}
-            label={option}
-            selected={mode === option}
-            onPress={() => setMode(option)}
-          />
-        ))}
-      </View>
-      <TextInput
-        accessibilityLabel="Search inventory"
-        autoCapitalize="none"
-        onChangeText={setSearch}
-        placeholder="Search inventory"
-        placeholderTextColor={colors.muted}
-        style={styles.search}
-        value={search}
-      />
-      {mode === "Collections" ? (
-        <>
-          <FlatList
-            horizontal
-            data={[
-              { handle: "", title: "All items" },
-              ...(collectionsQuery.data?.collections ?? [])
-            ]}
-            keyExtractor={(item) => item.handle || "all"}
-            renderItem={({ item }) => (
-              <Chip
-                label={item.title}
-                selected={(!item.handle && !category) || category === item.handle}
-                onPress={() => setCategory(item.handle || undefined)}
-              />
-            )}
-            ItemSeparatorComponent={() => <View style={{ width: spacing.sm }} />}
-            showsHorizontalScrollIndicator={false}
-          />
-          <View style={styles.filterRow}>
-            {sortOptions.map((option) => (
-              <Chip
-                key={option.value}
-                label={option.label}
-                selected={sort === option.value}
-                onPress={() => setSort(option.value)}
-              />
-            ))}
-          </View>
-          <Chip
-            label={inStockOnly ? "In stock only" : "All availability"}
-            selected={inStockOnly}
-            onPress={() => setInStockOnly((value) => !value)}
-          />
-        </>
       ) : null}
     </View>
   );
@@ -200,7 +175,8 @@ export function ShopScreen({ navigation }: Props) {
           />
         ) : strollProduct ? (
           <StrollCard
-            product={strollProduct}
+            inOrder={isInOrder(strollProduct)}
+            onAdd={() => addProduct(strollProduct)}
             onNext={() => {
               setStrolledIds((ids) =>
                 ids.includes(strollProduct.id) ? ids : [...ids, strollProduct.id]
@@ -208,10 +184,52 @@ export function ShopScreen({ navigation }: Props) {
               setStrollIndex((index) => index + 1);
             }}
             onPress={() => openProduct(strollProduct)}
+            product={strollProduct}
           />
         ) : (
-          <StateView title="No items found" message="Try clearing filters." showMascot />
+          <StateView title="No items found" message="Try clearing search." showMascot />
         )}
+      </Screen>
+    );
+  }
+
+  if (mode === "Collections") {
+    return (
+      <Screen scroll={false}>
+        <ScrollView
+          contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={refreshControl}
+        >
+          {header}
+          {collectionGroups.length ? (
+            collectionGroups.map((group) => (
+              <CollectionShelf
+                inOrder={isInOrder}
+                key={group.category}
+                onAdd={addProduct}
+                onPress={openProduct}
+                products={group.products}
+                title={group.category}
+              />
+            ))
+          ) : (
+            <StateView
+              title="No items found"
+              message="Stoopy did not find a match. Try another search."
+              showMascot
+            />
+          )}
+          {productsQuery.hasNextPage ? (
+            <AppButton
+              label="Load more finds"
+              loading={productsQuery.isFetchingNextPage}
+              onPress={() => void productsQuery.fetchNextPage()}
+              style={styles.loadMore}
+              variant="secondary"
+            />
+          ) : null}
+        </ScrollView>
       </Screen>
     );
   }
@@ -225,12 +243,17 @@ export function ShopScreen({ navigation }: Props) {
         ListEmptyComponent={
           <StateView
             title="No items found"
-            message="Stoopy did not find a match. Try another search or category."
+            message="Stoopy did not find a match. Try another search."
             showMascot
           />
         }
         renderItem={({ item }) => (
-          <ProductCard product={item} onPress={() => openProduct(item)} />
+          <ProductCard
+            inOrder={isInOrder(item)}
+            onAdd={() => addProduct(item)}
+            onPress={() => openProduct(item)}
+            product={item}
+          />
         )}
         numColumns={2}
         columnWrapperStyle={styles.gridRow}
@@ -247,14 +270,88 @@ export function ShopScreen({ navigation }: Props) {
   );
 }
 
-function StrollCard({
-  product,
-  onNext,
-  onPress
+function CollectionShelf({
+  inOrder,
+  onAdd,
+  onPress,
+  products,
+  title
 }: {
-  product: Product;
+  inOrder: (product: Product) => boolean;
+  onAdd: (product: Product) => void;
+  onPress: (product: Product) => void;
+  products: Product[];
+  title: string;
+}) {
+  return (
+    <View style={styles.shelf}>
+      <View style={styles.shelfHeader}>
+        <Text style={styles.shelfTitle}>{title}</Text>
+        <Text style={styles.shelfCount}>{products.length} finds</Text>
+      </View>
+      <ScrollView
+        horizontal
+        contentContainerStyle={styles.shelfRow}
+        showsHorizontalScrollIndicator={false}
+      >
+        {products.map((product) => (
+          <ProductCard
+            inOrder={inOrder(product)}
+            key={product.variantId}
+            onAdd={() => onAdd(product)}
+            onPress={() => onPress(product)}
+            product={product}
+            wide
+          />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function ModeSegment({
+  mode,
+  onChange
+}: {
+  mode: BrowseMode;
+  onChange: (mode: BrowseMode) => void;
+}) {
+  return (
+    <View style={styles.segment}>
+      {modes.map((option) => (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: mode === option }}
+          key={option}
+          onPress={() => onChange(option)}
+          style={[styles.segmentOption, mode === option && styles.segmentSelected]}
+        >
+          <Text
+            style={[
+              styles.segmentLabel,
+              mode === option && styles.segmentSelectedLabel
+            ]}
+          >
+            {option}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function StrollCard({
+  inOrder,
+  onAdd,
+  onNext,
+  onPress,
+  product
+}: {
+  inOrder: boolean;
+  onAdd: () => void;
   onNext: () => void;
   onPress: () => void;
+  product: Product;
 }) {
   const image = product.images[0];
   const descriptionStory = product.description.split(".")[0]?.trim();
@@ -265,34 +362,85 @@ function StrollCard({
       : "Stoopy found this second-life item for its next home.";
 
   return (
-    <Pressable onPress={onPress} style={styles.strollCard}>
-      {image ? (
-        <Image source={{ uri: image }} style={styles.strollImage} resizeMode="cover" />
-      ) : (
-        <View style={[styles.strollImage, styles.imageFallback]}>
-          <Text style={typography.h2}>$0</Text>
+    <View style={styles.strollCard}>
+      <View style={styles.stoopyRow}>
+        <StoopyMascot caption="" size="small" />
+        <View style={styles.speechBubble}>
+          <Text style={styles.speechTitle}>Stoopy found you something.</Text>
+          <Text style={styles.speechText}>
+            One second-life item at a time. Keep strolling for the next find.
+          </Text>
         </View>
-      )}
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${product.title}`}
+        onPress={onPress}
+        style={({ pressed }) => pressed && styles.pressed}
+      >
+        {image ? (
+          <Image source={{ uri: image }} style={styles.strollImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.strollImage, styles.imageFallback]}>
+            <Text style={typography.h2}>$0</Text>
+          </View>
+        )}
+      </Pressable>
       <View style={styles.strollBody}>
-        <View style={styles.stoopyRow}>
-          <StoopyMascot caption="" size="small" />
-          <View style={styles.speechBubble}>
-            <Text style={styles.speechTitle}>Stoopy found you something</Text>
-            <Text style={styles.speechText}>
-              One second-life item at a time. Keep strolling for the next find.
+        <Pressable onPress={onPress}>
+          <Text style={typography.h2}>{product.title}</Text>
+        </Pressable>
+        <View style={styles.strollMetaRow}>
+          <View style={styles.pricePill}>
+            <Text style={styles.pricePillText}>$0</Text>
+          </View>
+          <View style={styles.categoryPill}>
+            <Text numberOfLines={1} style={styles.categoryPillText}>
+              {product.category}
+            </Text>
+          </View>
+          <View style={styles.stockPill}>
+            <Text style={styles.stockPillText}>
+              {product.stockCount === 1 ? "Last one" : `${product.stockCount} left`}
             </Text>
           </View>
         </View>
-        <Text style={typography.h2}>{product.title}</Text>
-        <Text style={styles.price}>$0.00</Text>
-        <Text style={typography.body}>{story}</Text>
+        <View style={styles.originBox}>
+          <Text style={styles.originLabel}>Origin story</Text>
+          <Text style={styles.originText}>{story}</Text>
+        </View>
         <View style={styles.strollActions}>
-          <AppButton label="View item" onPress={onPress} />
-          <AppButton label="Next find" variant="secondary" onPress={onNext} />
+          <AppButton
+            label="Next find"
+            variant="secondary"
+            onPress={onNext}
+            style={styles.strollActionButton}
+          />
+          <AppButton
+            disabled={inOrder}
+            label={inOrder ? "In your order" : "Add to order"}
+            onPress={onAdd}
+            style={styles.strollActionButton}
+            variant={inOrder ? "accent" : "primary"}
+          />
         </View>
       </View>
-    </Pressable>
+    </View>
   );
+}
+
+function groupProductsByCategory(products: Product[]) {
+  const groups = new Map<string, Product[]>();
+  products.forEach((product) => {
+    const category = product.category || "Other finds";
+    const current = groups.get(category) ?? [];
+    current.push(product);
+    groups.set(category, current);
+  });
+
+  return Array.from(groups.entries())
+    .map(([category, groupProducts]) => ({ category, products: groupProducts }))
+    .sort((a, b) => b.products.length - a.products.length || a.category.localeCompare(b.category));
 }
 
 const styles = StyleSheet.create({
@@ -304,17 +452,42 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.lg
   },
+  brandRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: spacing.md
+  },
   subhead: {
     color: colors.forest,
-    fontSize: 16,
-    fontWeight: "700"
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  segment: {
+    backgroundColor: colors.paper2,
+    borderRadius: 999,
+    flexDirection: "row",
+    padding: spacing.xs
+  },
+  segmentOption: {
+    alignItems: "center",
+    borderRadius: 999,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 40
+  },
+  segmentSelected: {
+    backgroundColor: colors.forest
+  },
+  segmentLabel: {
+    color: colors.ink2,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  segmentSelectedLabel: {
+    color: colors.card
   },
   modeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm
-  },
-  filterRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm
@@ -329,8 +502,21 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: spacing.lg
   },
+  offlinePill: {
+    backgroundColor: colors.dangerBg,
+    borderColor: colors.danger,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs
+  },
+  offlinePillText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "900"
+  },
   offlineBanner: {
-    backgroundColor: colors.forest,
+    backgroundColor: colors.forestDark,
     borderRadius: 8,
     gap: spacing.xs,
     padding: spacing.md
@@ -350,25 +536,52 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.md
   },
+  shelf: {
+    gap: spacing.md,
+    marginBottom: spacing.xl
+  },
+  shelfHeader: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: spacing.md
+  },
+  shelfTitle: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  shelfCount: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  shelfRow: {
+    gap: spacing.md,
+    paddingRight: spacing.lg
+  },
+  loadMore: {
+    marginTop: spacing.sm
+  },
+  pressed: {
+    opacity: 0.8
+  },
   strollCard: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
-    overflow: "hidden"
+    gap: spacing.md
   },
   strollImage: {
     aspectRatio: 1,
+    backgroundColor: colors.paper2,
+    borderRadius: 8,
     width: "100%"
   },
   imageFallback: {
     alignItems: "center",
-    backgroundColor: "#ECE7DD",
     justifyContent: "center"
   },
   strollBody: {
-    gap: spacing.sm,
-    padding: spacing.lg
+    gap: spacing.md
   },
   stoopyRow: {
     alignItems: "center",
@@ -376,7 +589,7 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
   speechBubble: {
-    backgroundColor: colors.cream,
+    backgroundColor: colors.card,
     borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
@@ -393,13 +606,69 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18
   },
-  price: {
-    color: colors.forest,
-    fontSize: 24,
+  strollMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
+  },
+  pricePill: {
+    backgroundColor: colors.forest,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs
+  },
+  pricePillText: {
+    color: colors.card,
+    fontSize: 16,
     fontWeight: "900"
   },
+  categoryPill: {
+    backgroundColor: colors.paper2,
+    borderRadius: 999,
+    maxWidth: "55%",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs
+  },
+  categoryPillText: {
+    color: colors.forest,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  stockPill: {
+    backgroundColor: colors.lime,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs
+  },
+  stockPillText: {
+    color: colors.limeInk,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  originBox: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.md
+  },
+  originLabel: {
+    color: colors.forest,
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase"
+  },
+  originText: {
+    color: colors.ink2,
+    fontSize: 15,
+    lineHeight: 21
+  },
   strollActions: {
-    gap: spacing.sm,
-    marginTop: spacing.md
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  strollActionButton: {
+    flex: 1
   }
 });

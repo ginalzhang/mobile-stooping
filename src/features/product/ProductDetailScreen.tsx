@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Image, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { fetchProduct } from "../../api/shopify";
 import { AppButton } from "../../components/AppButton";
@@ -59,6 +59,14 @@ export function ProductDetailScreen({ route, navigation }: Props) {
 
   return (
     <Screen>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Back to shop"
+        onPress={() => navigation.goBack()}
+        style={styles.backButton}
+      >
+        <Text style={styles.backText}>‹ Shop</Text>
+      </Pressable>
       <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
         {product.images.length ? (
           product.images.map((uri) => (
@@ -158,5 +166,18 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.xl,
     padding: spacing.lg
+  },
+  backButton: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.paper2,
+    borderRadius: 999,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
+  },
+  backText: {
+    color: colors.forest,
+    fontSize: 15,
+    fontWeight: "900"
   }
 });

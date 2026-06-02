@@ -2,9 +2,10 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { ComponentType } from "react";
-import { Text } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { CartScreen } from "../features/cart/CartScreen";
+import { useCart } from "../features/cart/CartContext";
 import { ConfirmationScreen } from "../features/cart/ConfirmationScreen";
 import { ProductDetailScreen } from "../features/product/ProductDetailScreen";
 import { ShopScreen } from "../features/shop/ShopScreen";
@@ -78,6 +79,8 @@ function AboutNavigator() {
 }
 
 export function AppNavigator() {
+  const { totalQuantity } = useCart();
+
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -92,11 +95,19 @@ export function AppNavigator() {
             paddingBottom: 8,
             paddingTop: 8
           },
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20, fontWeight: "900" }}>
-              {route.name === "Shop" ? "$0" : route.name === "Order" ? "✓" : "↺"}
-            </Text>
-          )
+          tabBarIcon: ({ color }) => {
+            const icon = route.name === "Shop" ? "▰" : route.name === "Order" ? "▣" : "↻";
+            return (
+              <View>
+                <Text style={{ color, fontSize: 20, fontWeight: "900" }}>{icon}</Text>
+                {route.name === "Order" && totalQuantity > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{totalQuantity}</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          }
         })}
       >
         <Tab.Screen component={ShopNavigator} name="Shop" />
@@ -109,6 +120,7 @@ export function AppNavigator() {
 
 const stackOptions = {
   contentStyle: { backgroundColor: colors.cream },
+  headerShown: false,
   headerStyle: { backgroundColor: colors.cream },
   headerShadowVisible: false,
   headerTintColor: colors.forest,
@@ -117,3 +129,22 @@ const stackOptions = {
     fontWeight: "900" as const
   }
 };
+
+const styles = StyleSheet.create({
+  badge: {
+    alignItems: "center",
+    backgroundColor: colors.rust,
+    borderRadius: 999,
+    height: 18,
+    justifyContent: "center",
+    minWidth: 18,
+    position: "absolute",
+    right: -12,
+    top: -5
+  },
+  badgeText: {
+    color: colors.card,
+    fontSize: 11,
+    fontWeight: "900"
+  }
+});

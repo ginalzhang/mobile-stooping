@@ -12,7 +12,7 @@ import { colors } from "../theme/colors";
 
 type AppButtonProps = Omit<PressableProps, "style"> & {
   label: string;
-  variant?: "primary" | "secondary" | "danger";
+  variant?: "primary" | "secondary" | "accent" | "danger";
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
 };
@@ -41,9 +41,15 @@ export function AppButton({
       {...props}
     >
       {loading ? (
-        <ActivityIndicator color={variant === "primary" ? colors.ink : colors.forest} />
+        <ActivityIndicator color={variant === "primary" ? colors.card : colors.forest} />
       ) : (
-        <Text style={[styles.label, variant === "primary" && styles.primaryLabel]}>
+        <Text
+          style={[
+            styles.label,
+            variant === "primary" && styles.primaryLabel,
+            variant === "accent" && styles.accentLabel
+          ]}
+        >
           {label}
         </Text>
       )}
@@ -61,12 +67,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12
   },
   primary: {
-    backgroundColor: colors.lime
+    backgroundColor: colors.forest
   },
   secondary: {
     backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderWidth: 1
+    borderColor: colors.forest,
+    borderWidth: 1.5
+  },
+  accent: {
+    backgroundColor: colors.lime
   },
   danger: {
     backgroundColor: "#F7E0DC",
@@ -85,6 +94,9 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   primaryLabel: {
-    color: colors.ink
+    color: colors.card
+  },
+  accentLabel: {
+    color: colors.limeInk
   }
 });

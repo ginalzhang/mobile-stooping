@@ -19,9 +19,9 @@ export const radii = {
 export const typography = StyleSheet.create({
   h1: {
     color: colors.ink,
-    fontSize: 30,
-    fontWeight: "800",
-    lineHeight: 36
+    fontSize: 28,
+    fontWeight: "900",
+    lineHeight: 31
   },
   h2: {
     color: colors.ink,

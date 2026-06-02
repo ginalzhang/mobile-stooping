@@ -3,7 +3,6 @@ import { Linking, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../../../components/AppButton";
 import { BrandLogo } from "../../../components/BrandLogo";
-import { Chip } from "../../../components/Chip";
 import { Screen } from "../../../components/Screen";
 import { StoopyMascot } from "../../../components/StoopyMascot";
 import { DEFAULT_PICKUP } from "../../../constants/pickup";
@@ -27,14 +26,18 @@ export function AboutScreen() {
     <Screen>
       <View style={styles.page}>
         <View style={styles.hero}>
-          <BrandLogo size="large" />
-          <Chip label="About Stooping Club" selected />
-          <Text style={typography.h1}>Good finds should keep moving.</Text>
+          <BrandLogo size="medium" />
+          <View style={styles.heroTitleRow}>
+            <StoopyMascot caption="" size="medium" />
+            <Text style={[typography.h1, styles.heroTitle]}>
+              Good finds should keep moving.
+            </Text>
+          </View>
           <Text style={[typography.body, styles.heroBody]}>
             Stooping Club helps neighbors rescue useful household goods, reserve
-            them quickly, and pick them up through small local drops.
+            them quickly, and pick them up through small local drops. Meet Stoopy,
+            our guide to the good stuff.
           </Text>
-          <StoopyMascot caption="Our mascot: Stoopy" size="medium" />
         </View>
 
         <View style={styles.twoColumn}>
@@ -77,7 +80,7 @@ export function AboutScreen() {
         </Section>
 
         <Section title="Team">
-          <View style={styles.teamList}>
+          <View style={styles.teamGrid}>
             {teamMembers.map((member) => (
               <View key={member.name} style={styles.teamCard}>
                 <View style={styles.avatar}>
@@ -86,7 +89,6 @@ export function AboutScreen() {
                 <View style={styles.teamCopy}>
                   <Text style={styles.teamName}>{member.name}</Text>
                   <Text style={styles.teamRole}>{member.role}</Text>
-                  <Text style={styles.teamBio}>{member.bio}</Text>
                 </View>
               </View>
             ))}
@@ -172,8 +174,16 @@ const styles = StyleSheet.create({
   hero: {
     gap: spacing.md
   },
+  heroTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.md
+  },
+  heroTitle: {
+    flex: 1
+  },
   heroBody: {
-    color: colors.muted
+    color: colors.ink2
   },
   twoColumn: {
     gap: spacing.md
@@ -200,6 +210,8 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
   statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.md
   },
   statCard: {
@@ -207,6 +219,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radii.md,
     borderWidth: 1,
+    flexBasis: "47%",
+    flexGrow: 1,
+    minHeight: 120,
     padding: spacing.lg
   },
   statValue: {
@@ -268,7 +283,9 @@ const styles = StyleSheet.create({
   timelineBody: {
     ...typography.caption
   },
-  teamList: {
+  teamGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.md
   },
   teamCard: {
@@ -277,6 +294,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radii.md,
     borderWidth: 1,
+    flexBasis: "47%",
+    flexGrow: 1,
     flexDirection: "row",
     gap: spacing.md,
     padding: spacing.md
@@ -300,22 +319,19 @@ const styles = StyleSheet.create({
   },
   teamName: {
     color: colors.ink,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "900"
   },
   teamRole: {
     color: colors.forest,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800"
   },
-  teamBio: {
-    ...typography.caption
-  },
   branchCard: {
-    backgroundColor: colors.forest,
+    backgroundColor: colors.forestDark,
     borderRadius: radii.md,
     gap: spacing.md,
-    padding: spacing.lg
+    padding: spacing.xl
   },
   branchTitle: {
     color: colors.card,

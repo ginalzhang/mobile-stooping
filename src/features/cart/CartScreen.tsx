@@ -43,6 +43,14 @@ export function CartScreen({ navigation }: Props) {
     () => name.trim() && email.includes("@") && phone.trim().length >= 7,
     [email, name, phone]
   );
+  const estimatedSavings = useMemo(
+    () =>
+      items.reduce(
+        (sum, item) => sum + parseRetailValue(item.product.estimatedRetailValue) * item.quantity,
+        0
+      ),
+    [items]
+  );
 
   const checkout = async () => {
     if (!items.length) return;
@@ -125,8 +133,17 @@ export function CartScreen({ navigation }: Props) {
       <View style={styles.header}>
         <Text style={typography.h1}>Your order</Text>
         <Text style={styles.limit}>
-          {totalQuantity}/{ORDER_LIMIT} items. One order per week per person.
+          {totalQuantity} of {ORDER_LIMIT} reserved
+          {estimatedSavings > 0 ? ` · about $${estimatedSavings} kept in your pocket` : ""}
         </Text>
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${Math.min(100, (totalQuantity / ORDER_LIMIT) * 100)}%` }
+            ]}
+          />
+        </View>
       </View>
       <View style={styles.items}>
         {items.map((item) => (
@@ -140,7 +157,15 @@ export function CartScreen({ navigation }: Props) {
               <Text numberOfLines={2} style={styles.itemTitle}>
                 {item.product.title}
               </Text>
-              <Text style={typography.caption}>Qty {item.quantity} · $0.00</Text>
+              <View style={styles.itemMetaRow}>
+                <Text style={styles.itemPrice}>$0</Text>
+                {item.product.estimatedRetailValue !== "Not listed" ? (
+                  <Text style={styles.itemRetail}>{item.product.estimatedRetailValue}</Text>
+                ) : null}
+                <Text numberOfLines={1} style={styles.conditionPill}>
+                  {item.product.condition}
+                </Text>
+              </View>
             </View>
             <Pressable
               accessibilityRole="button"
@@ -148,7 +173,7 @@ export function CartScreen({ navigation }: Props) {
               onPress={() => removeItem(item.product.variantId)}
               style={styles.remove}
             >
-              <Text style={styles.removeText}>Remove</Text>
+              <Text style={styles.removeText}>⌫</Text>
             </Pressable>
           </View>
         ))}
@@ -185,11 +210,14 @@ export function CartScreen({ navigation }: Props) {
       </View>
       <PickupPolicy />
       <AppButton
-        label="Confirm order"
+        label={`Reserve ${totalQuantity} ${totalQuantity === 1 ? "find" : "finds"} for Sunday`}
         loading={checkingOut}
         disabled={!items.length}
         onPress={checkout}
       />
+      <Text style={styles.reminderText}>
+        We’ll text a reminder Friday to confirm, and Sunday before pickup.
+      </Text>
     </Screen>
   );
 }
@@ -210,6 +238,11 @@ function PickupPolicy() {
   );
 }
 
+function parseRetailValue(value: string) {
+  const match = value.match(/\$?([0-9]+(?:\.[0-9]+)?)/);
+  return match ? Math.round(Number(match[1])) : 0;
+}
+
 const styles = StyleSheet.create({
   header: {
     gap: spacing.sm,
@@ -220,24 +253,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800"
   },
-  items: {
-    gap: spacing.md
+  progressTrack: {
+    backgroundColor: colors.paper2,
+    borderRadius: 999,
+    height: 6,
+    overflow: "hidden"
   },
-  itemRow: {
-    alignItems: "center",
+  progressFill: {
+    backgroundColor: colors.forest,
+    borderRadius: 999,
+    height: "100%"
+  },
+  items: {
     backgroundColor: colors.card,
     borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing.md,
     padding: spacing.md
   },
+  itemRow: {
+    alignItems: "center",
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    borderRadius: 8,
+    flexDirection: "row",
+    gap: spacing.md,
+    paddingVertical: spacing.md
+  },
   thumb: {
-    backgroundColor: "#ECE7DD",
+    backgroundColor: colors.paper2,
     borderRadius: 6,
-    height: 72,
-    width: 72
+    height: 62,
+    width: 62
   },
   thumbFallback: {
     borderColor: colors.border,
@@ -250,15 +297,47 @@ const styles = StyleSheet.create({
   itemTitle: {
     color: colors.ink,
     fontSize: 15,
-    fontWeight: "800"
+    fontWeight: "900"
+  },
+  itemMetaRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm
+  },
+  itemPrice: {
+    color: colors.forest,
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  itemRetail: {
+    color: colors.faint,
+    fontSize: 13,
+    fontWeight: "800",
+    textDecorationLine: "line-through"
+  },
+  conditionPill: {
+    backgroundColor: colors.paper2,
+    borderRadius: 999,
+    color: colors.forest,
+    fontSize: 12,
+    fontWeight: "800",
+    maxWidth: 110,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs
   },
   remove: {
-    minHeight: 44,
-    justifyContent: "center"
+    alignItems: "center",
+    backgroundColor: colors.paper2,
+    borderRadius: 999,
+    height: 36,
+    justifyContent: "center",
+    width: 36
   },
   removeText: {
     color: colors.danger,
-    fontWeight: "800"
+    fontSize: 16,
+    fontWeight: "900"
   },
   form: {
     gap: spacing.md,
@@ -286,5 +365,13 @@ const styles = StyleSheet.create({
   emptyBrand: {
     alignItems: "center",
     marginBottom: spacing.lg
+  },
+  reminderText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
+    marginTop: spacing.md,
+    textAlign: "center"
   }
 });
