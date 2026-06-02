@@ -18,6 +18,7 @@ import { Chip } from "../../components/Chip";
 import { ProductCard } from "../../components/ProductCard";
 import { Screen } from "../../components/Screen";
 import { StateView } from "../../components/StateView";
+import { StoopyMascot } from "../../components/StoopyMascot";
 import { colors } from "../../theme/colors";
 import { spacing, typography } from "../../theme/theme";
 import type { Product, ProductSort } from "../../types/product";
@@ -57,6 +58,9 @@ export function ShopScreen({ navigation }: Props) {
     () => productsQuery.data?.pages.flatMap((page) => page.products) ?? [],
     [productsQuery.data]
   );
+  const usingCachedInventory = Boolean(
+    productsQuery.data?.pages.some((page) => page.source === "cache")
+  );
   const strollProduct = products[strollIndex % Math.max(products.length, 1)];
 
   const openProduct = (product: Product) => {
@@ -69,6 +73,14 @@ export function ShopScreen({ navigation }: Props) {
   const header = (
     <View style={styles.header}>
       <BrandLogo size="medium" />
+      {usingCachedInventory ? (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineTitle}>Offline mode</Text>
+          <Text style={styles.offlineText}>
+            Showing the last inventory we loaded. Pull back online before checkout.
+          </Text>
+        </View>
+      ) : null}
       <Text style={typography.h1}>Free treasures, ready for a good home</Text>
       <Text style={styles.subhead}>Hot items move fast. Everything is $0.</Text>
       <View style={styles.modeRow}>
@@ -147,6 +159,7 @@ export function ShopScreen({ navigation }: Props) {
           message="Check the Storefront API env vars and network connection."
           actionLabel="Try again"
           onAction={() => void productsQuery.refetch()}
+          showMascot
         />
       </Screen>
     );
@@ -163,7 +176,7 @@ export function ShopScreen({ navigation }: Props) {
             onPress={() => openProduct(strollProduct)}
           />
         ) : (
-          <StateView title="No items found" message="Try clearing filters." />
+          <StateView title="No items found" message="Try clearing filters." showMascot />
         )}
       </Screen>
     );
@@ -176,7 +189,11 @@ export function ShopScreen({ navigation }: Props) {
         keyExtractor={(item) => item.variantId}
         ListHeaderComponent={header}
         ListEmptyComponent={
-          <StateView title="No items found" message="Try another search or category." />
+          <StateView
+            title="No items found"
+            message="Stoopy did not find a match. Try another search or category."
+            showMascot
+          />
         }
         renderItem={({ item }) => (
           <ProductCard product={item} onPress={() => openProduct(item)} />
@@ -205,9 +222,12 @@ function StrollCard({
   onPress: () => void;
 }) {
   const image = product.images[0];
-  const story =
-    product.description.split(".")[0]?.trim() ||
-    `${product.category} ready for a second life.`;
+  const descriptionStory = product.description.split(".")[0]?.trim();
+  const story = descriptionStory
+    ? `${descriptionStory}.`
+    : product.category && product.category !== "Uncategorized"
+      ? `${product.category} ready for a second life.`
+      : "Stoopy found this second-life item for its next home.";
 
   return (
     <Pressable onPress={onPress} style={styles.strollCard}>
@@ -219,9 +239,18 @@ function StrollCard({
         </View>
       )}
       <View style={styles.strollBody}>
+        <View style={styles.stoopyRow}>
+          <StoopyMascot caption="" size="small" />
+          <View style={styles.speechBubble}>
+            <Text style={styles.speechTitle}>Stoopy found you something</Text>
+            <Text style={styles.speechText}>
+              One second-life item at a time. Keep strolling for the next find.
+            </Text>
+          </View>
+        </View>
         <Text style={typography.h2}>{product.title}</Text>
         <Text style={styles.price}>$0.00</Text>
-        <Text style={typography.body}>{story}.</Text>
+        <Text style={typography.body}>{story}</Text>
         <View style={styles.strollActions}>
           <AppButton label="View item" onPress={onPress} />
           <AppButton label="Next find" variant="secondary" onPress={onNext} />
@@ -265,6 +294,23 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: spacing.lg
   },
+  offlineBanner: {
+    backgroundColor: colors.forest,
+    borderRadius: 8,
+    gap: spacing.xs,
+    padding: spacing.md
+  },
+  offlineTitle: {
+    color: colors.lime,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  offlineText: {
+    color: colors.card,
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18
+  },
   gridRow: {
     gap: spacing.md,
     marginBottom: spacing.md
@@ -288,6 +334,29 @@ const styles = StyleSheet.create({
   strollBody: {
     gap: spacing.sm,
     padding: spacing.lg
+  },
+  stoopyRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.md
+  },
+  speechBubble: {
+    backgroundColor: colors.cream,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    padding: spacing.md
+  },
+  speechTitle: {
+    color: colors.forest,
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  speechText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 18
   },
   price: {
     color: colors.forest,

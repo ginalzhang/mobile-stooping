@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import type { CartItem, CustomerInfo } from "../types/order";
 import type { Product, ProductFilters, ProductPage, ProductSort } from "../types/product";
 
@@ -10,6 +12,11 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_IMAGES = 8;
 const MAX_VARIANTS = 10;
 const MAX_COLLECTIONS = 50;
+const PRODUCT_CACHE_KEY = "stooping.products.cache.v1";
+const SYSTEM_COLLECTION_TITLES = new Set([
+  "smart products filter index - do not delete",
+  "shop (in-stock)"
+]);
 
 const SHOPIFY_DOMAIN = process.env.EXPO_PUBLIC_SHOPIFY_DOMAIN;
 const STOREFRONT_TOKEN = process.env.EXPO_PUBLIC_STOREFRONT_TOKEN;
@@ -43,11 +50,6 @@ type ShopifyImage = {
   altText?: string | null;
 };
 
-type ShopifyMetafield = {
-  value: string;
-  type?: string;
-} | null | undefined;
-
 type ShopifyVariant = {
   id: string;
   availableForSale: boolean;
@@ -68,14 +70,6 @@ type ShopifyProductNode = {
   images: Connection<ShopifyImage>;
   variants: Connection<ShopifyVariant>;
   collections?: Connection<Pick<ShopifyCollection, "handle" | "title">>;
-  estimatedRetailValue?: ShopifyMetafield;
-  estimatedRetail?: ShopifyMetafield;
-  retailValue?: ShopifyMetafield;
-  condition?: ShopifyMetafield;
-  itemCondition?: ShopifyMetafield;
-  stockCount?: ShopifyMetafield;
-  quantity?: ShopifyMetafield;
-  category?: ShopifyMetafield;
 };
 
 type Connection<T> = {
@@ -146,38 +140,6 @@ const PRODUCT_FRAGMENT = `
         }
       }
     }
-    estimatedRetailValue: metafield(namespace: "custom", key: "estimated_retail_value") {
-      value
-      type
-    }
-    estimatedRetail: metafield(namespace: "custom", key: "estimated_retail") {
-      value
-      type
-    }
-    retailValue: metafield(namespace: "custom", key: "retail_value") {
-      value
-      type
-    }
-    condition: metafield(namespace: "custom", key: "condition") {
-      value
-      type
-    }
-    itemCondition: metafield(namespace: "custom", key: "item_condition") {
-      value
-      type
-    }
-    stockCount: metafield(namespace: "custom", key: "stock_count") {
-      value
-      type
-    }
-    quantity: metafield(namespace: "custom", key: "quantity") {
-      value
-      type
-    }
-    category: metafield(namespace: "custom", key: "category") {
-      value
-      type
-    }
   }
 `;
 
@@ -185,52 +147,31 @@ export async function fetchProducts(
   filters: ProductFilters = {},
   pageSize = DEFAULT_PAGE_SIZE
 ): Promise<ProductPage> {
-  if (filters.category) {
-    return fetchProductsByCollection(filters.category, filters, pageSize);
-  }
+  try {
+    const page = filters.category
+      ? await fetchProductsByCollection(filters.category, filters, pageSize)
+      : await fetchProductsFromStorefront(filters, pageSize);
 
-  const sort = mapProductSort(filters.sort);
-  const query = buildProductQuery(filters);
-  const response = await storefrontRequest<{
-    products: Connection<ShopifyProductNode>;
-  }>(
-    `${PRODUCT_FRAGMENT}
-    query Products(
-      $first: Int!
-      $after: String
-      $query: String
-      $sortKey: ProductSortKeys
-      $reverse: Boolean
-    ) {
-      products(
-        first: $first
-        after: $after
-        query: $query
-        sortKey: $sortKey
-        reverse: $reverse
-      ) {
-        edges {
-          cursor
-          node {
-            ...StoopingProductFields
-          }
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-      }
-    }`,
-    {
-      first: pageSize,
-      after: filters.cursor ?? null,
-      query,
-      sortKey: sort.sortKey,
-      reverse: sort.reverse
+    await cacheProducts(page.products);
+
+    return { ...page, source: "live" };
+  } catch (error) {
+    const cachedProducts = await readCachedProducts();
+
+    if (cachedProducts.length > 0) {
+      return {
+        products: applyClientProductFilters(
+          sortCachedProducts(cachedProducts, filters.sort),
+          filters
+        ),
+        nextCursor: null,
+        hasNextPage: false,
+        source: "cache"
+      };
     }
-  );
 
-  return connectionToProductPage(response.products);
+    throw error;
+  }
 }
 
 export async function fetchProductById(id: string): Promise<Product | null> {
@@ -435,15 +376,24 @@ function buildCartAttributes(
 
 function applyClientProductFilters(products: Product[], filters: ProductFilters): Product[] {
   const search = filters.search?.trim().toLowerCase();
+  const category = filters.category?.trim().toLowerCase();
 
   return products.filter((product) => {
     if (filters.inStockOnly && !product.availableForSale) {
       return false;
     }
 
-    if (!search) {
-      return true;
+    if (category) {
+      const categoryMatches = [product.category, ...product.tags].some(
+        (value) => normalizeHandle(value) === category || value.toLowerCase() === category
+      );
+
+      if (!categoryMatches) {
+        return false;
+      }
     }
+
+    if (!search) return true;
 
     return [
       product.title,
@@ -452,6 +402,54 @@ function applyClientProductFilters(products: Product[], filters: ProductFilters)
       ...product.tags
     ].some((value) => value.toLowerCase().includes(search));
   });
+}
+
+async function fetchProductsFromStorefront(
+  filters: ProductFilters,
+  pageSize: number
+): Promise<ProductPage> {
+  const sort = mapProductSort(filters.sort);
+  const query = buildProductQuery(filters);
+  const response = await storefrontRequest<{
+    products: Connection<ShopifyProductNode>;
+  }>(
+    `${PRODUCT_FRAGMENT}
+    query Products(
+      $first: Int!
+      $after: String
+      $query: String
+      $sortKey: ProductSortKeys
+      $reverse: Boolean
+    ) {
+      products(
+        first: $first
+        after: $after
+        query: $query
+        sortKey: $sortKey
+        reverse: $reverse
+      ) {
+        edges {
+          cursor
+          node {
+            ...StoopingProductFields
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }`,
+    {
+      first: pageSize,
+      after: filters.cursor ?? null,
+      query,
+      sortKey: sort.sortKey,
+      reverse: sort.reverse
+    }
+  );
+
+  return connectionToProductPage(response.products);
 }
 
 async function fetchProductsByCollection(
@@ -576,12 +574,8 @@ function mapProduct(product: ShopifyProductNode): Product {
     description: product.description ?? "",
     images,
     price: formatMoney(variant?.price),
-    estimatedRetailValue: resolveMetafieldValue(
-      product.estimatedRetailValue,
-      product.estimatedRetail,
-      product.retailValue
-    ),
-    condition: resolveMetafieldValue(product.condition, product.itemCondition) || "Unknown",
+    estimatedRetailValue: "Not listed",
+    condition: resolveCondition(product.tags),
     stockCount,
     availableForSale: Boolean(product.availableForSale && variant?.availableForSale && stockCount > 0),
     category: resolveCategory(product),
@@ -590,14 +584,6 @@ function mapProduct(product: ShopifyProductNode): Product {
 }
 
 function resolveStockCount(product: ShopifyProductNode, variant?: ShopifyVariant): number {
-  const metafieldCount = parseOptionalNumber(
-    resolveMetafieldValue(product.stockCount, product.quantity)
-  );
-
-  if (metafieldCount !== null) {
-    return Math.max(0, metafieldCount);
-  }
-
   if (typeof variant?.quantityAvailable === "number") {
     return Math.max(0, variant.quantityAvailable);
   }
@@ -610,29 +596,31 @@ function resolveStockCount(product: ShopifyProductNode, variant?: ShopifyVariant
 }
 
 function resolveCategory(product: ShopifyProductNode): string {
-  const metafieldCategory = resolveMetafieldValue(product.category);
+  const tagCategory = product.tags.find((tag) => isUsefulCategoryLabel(tag));
 
-  if (metafieldCategory) {
-    return metafieldCategory;
-  }
+  if (tagCategory) return tagCategory;
 
-  if (product.productType) {
-    return product.productType;
-  }
+  const collection = product.collections?.edges
+    .map(({ node }) => node)
+    .find((node) => isUsefulCategoryLabel(node.title));
 
-  const collection = product.collections?.edges[0]?.node;
+  if (collection?.title) return collection.title;
 
-  if (collection?.title) {
-    return collection.title;
-  }
+  if (product.productType) return product.productType;
 
   return product.tags[0] ?? "Uncategorized";
 }
 
-function resolveMetafieldValue(...metafields: ShopifyMetafield[]): string {
-  const metafield = metafields.find((field) => field?.value);
+function resolveCondition(tags: string[]): string {
+  const conditionTag = tags.find((tag) => tag.toLowerCase().startsWith("condition:"));
 
-  return metafield?.value?.trim() ?? "";
+  return conditionTag?.split(":").slice(1).join(":").trim() || "Good used condition";
+}
+
+function isUsefulCategoryLabel(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+
+  return Boolean(normalized && !normalized.startsWith("condition:") && !SYSTEM_COLLECTION_TITLES.has(normalized));
 }
 
 function formatMoney(money?: ShopifyMoney): string {
@@ -652,12 +640,6 @@ function formatMoney(money?: ShopifyMoney): string {
   }).format(amount);
 }
 
-function parseOptionalNumber(value: string): number | null {
-  const parsed = Number.parseInt(value, 10);
-
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function buildProductQuery(filters: ProductFilters): string | null {
   const parts: string[] = [];
 
@@ -667,7 +649,7 @@ function buildProductQuery(filters: ProductFilters): string | null {
 
   if (filters.category?.trim()) {
     const category = quoteSearchValue(filters.category.trim());
-    parts.push(`product_type:${category}`);
+    parts.push(`tag:${category}`);
   }
 
   if (filters.inStockOnly) {
@@ -742,6 +724,10 @@ function quoteSearchValue(value: string): string {
 }
 
 function toHandle(value: string): string {
+  return normalizeHandle(value);
+}
+
+function normalizeHandle(value: string): string {
   return value
     .trim()
     .toLowerCase()
@@ -751,4 +737,43 @@ function toHandle(value: string): string {
 
 function uniqueStrings(values: Array<string | null | undefined>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
+
+async function cacheProducts(products: Product[]): Promise<void> {
+  if (products.length === 0) return;
+
+  await AsyncStorage.setItem(
+    PRODUCT_CACHE_KEY,
+    JSON.stringify({
+      cachedAt: new Date().toISOString(),
+      products
+    })
+  );
+}
+
+async function readCachedProducts(): Promise<Product[]> {
+  const cached = await AsyncStorage.getItem(PRODUCT_CACHE_KEY);
+
+  if (!cached) return [];
+
+  try {
+    const parsed = JSON.parse(cached) as { products?: Product[] };
+
+    return Array.isArray(parsed.products) ? parsed.products : [];
+  } catch {
+    return [];
+  }
+}
+
+function sortCachedProducts(products: Product[], sort: ProductSort = "RECENTLY_ADDED"): Product[] {
+  const nextProducts = [...products];
+
+  switch (sort) {
+    case "TITLE_ASC":
+      return nextProducts.sort((a, b) => a.title.localeCompare(b.title));
+    case "TITLE_DESC":
+      return nextProducts.sort((a, b) => b.title.localeCompare(a.title));
+    default:
+      return nextProducts;
+  }
 }

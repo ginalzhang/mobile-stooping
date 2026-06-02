@@ -14,6 +14,8 @@ export type Product = {
   tags: string[];
 };
 
+export type ProductPageSource = "live" | "cache";
+
 export type ProductSort =
   | "RECENTLY_ADDED"
   | "POPULAR"
@@ -33,4 +35,5 @@ export type ProductPage = {
   products: Product[];
   nextCursor: string | null;
   hasNextPage: boolean;
+  source?: ProductPageSource;
 };

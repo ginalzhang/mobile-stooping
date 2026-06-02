@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { colors } from "../theme/colors";
 import { spacing, typography } from "../theme/theme";
 import { AppButton } from "./AppButton";
+import { StoopyMascot } from "./StoopyMascot";
 
 type StateViewProps = {
   title: string;
@@ -10,6 +11,7 @@ type StateViewProps = {
   actionLabel?: string;
   onAction?: () => void;
   loading?: boolean;
+  showMascot?: boolean;
 };
 
 export function StateView({
@@ -17,10 +19,12 @@ export function StateView({
   message,
   actionLabel,
   onAction,
-  loading
+  loading,
+  showMascot
 }: StateViewProps) {
   return (
     <View style={styles.wrap}>
+      {showMascot ? <StoopyMascot caption="" size="small" /> : null}
       {loading ? <ActivityIndicator color={colors.forest} /> : null}
       <Text style={typography.h3}>{title}</Text>
       {message ? <Text style={[typography.body, styles.message]}>{message}</Text> : null}
