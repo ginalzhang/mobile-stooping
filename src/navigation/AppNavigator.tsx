@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { ComponentType } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import Svg, { Path } from "react-native-svg";
 
 import { CartScreen } from "../features/cart/CartScreen";
 import { useCart } from "../features/cart/CartContext";
@@ -96,10 +97,9 @@ export function AppNavigator() {
             paddingTop: 8
           },
           tabBarIcon: ({ color }) => {
-            const icon = route.name === "Shop" ? "▰" : route.name === "Order" ? "▣" : "↻";
             return (
               <View>
-                <Text style={{ color, fontSize: 20, fontWeight: "900" }}>{icon}</Text>
+                <TabIcon color={color} name={route.name} />
                 {route.name === "Order" && totalQuantity > 0 ? (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>{totalQuantity}</Text>
@@ -115,6 +115,62 @@ export function AppNavigator() {
         <Tab.Screen component={AboutNavigator} name="About" />
       </Tab.Navigator>
     </NavigationContainer>
+  );
+}
+
+function TabIcon({ color, name }: { color: string; name: keyof RootTabParamList }) {
+  if (name === "Shop") {
+    return (
+      <Svg fill="none" height={24} viewBox="0 0 24 24" width={24}>
+        <Path
+          d="M5 9h14l-1.2 10.2A2 2 0 0 1 15.82 21H8.18a2 2 0 0 1-1.98-1.8L5 9Z"
+          stroke={color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+        />
+        <Path
+          d="M8 9 10.2 4.5M16 9l-2.2-4.5M7.5 13h9"
+          stroke={color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+        />
+      </Svg>
+    );
+  }
+
+  if (name === "Order") {
+    return (
+      <Svg fill="none" height={24} viewBox="0 0 24 24" width={24}>
+        <Path
+          d="M6.5 8.5h11l1 11A1.5 1.5 0 0 1 17 21H7a1.5 1.5 0 0 1-1.49-1.5l.99-11Z"
+          stroke={color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+        />
+        <Path
+          d="M9 8.5V7a3 3 0 0 1 6 0v1.5M9.5 15.5c1.5 1.2 3.5 1.2 5 0"
+          stroke={color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+        />
+      </Svg>
+    );
+  }
+
+  return (
+    <Svg fill="none" height={24} viewBox="0 0 24 24" width={24}>
+      <Path
+        d="M17.5 7.5A7 7 0 0 0 5.8 9.4M5 5.5v4.2h4.2M6.5 16.5a7 7 0 0 0 11.7-1.9M19 18.5v-4.2h-4.2"
+        stroke={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+      />
+    </Svg>
   );
 }
 
