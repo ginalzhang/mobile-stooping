@@ -1,4 +1,11 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle
+} from "react-native";
 
 import stoopy from "../../assets/brand/stoopy-mascot.png";
 import { colors } from "../theme/colors";
@@ -7,6 +14,7 @@ import { spacing } from "../theme/theme";
 type StoopyMascotProps = {
   size?: "small" | "medium" | "large";
   caption?: string;
+  containerStyle?: StyleProp<ViewStyle>;
 };
 
 const mascotSizes = {
@@ -17,10 +25,11 @@ const mascotSizes = {
 
 export function StoopyMascot({
   size = "medium",
-  caption = "Stoopy"
+  caption = "Stoopy",
+  containerStyle
 }: StoopyMascotProps) {
   return (
-    <View style={[styles.card, size === "small" && styles.smallCard]}>
+    <View style={[styles.card, size === "small" && styles.smallCard, containerStyle]}>
       <Image
         accessibilityIgnoresInvertColors
         accessibilityLabel="Stoopy mascot"
