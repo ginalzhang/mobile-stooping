@@ -119,6 +119,7 @@ export function ShopScreen({ navigation }: Props) {
 
   const header = (
     <View style={styles.header}>
+      {usingCachedInventory ? <OfflineInventoryBanner compact={mode === "Stroll"} /> : null}
       <View style={styles.brandRow}>
         <BrandLogo size="medium" />
         {usingCachedInventory ? (
@@ -137,22 +138,27 @@ export function ShopScreen({ navigation }: Props) {
       ) : null}
       <ModeSegment mode={mode} onChange={setMode} />
       {mode !== "Stroll" ? (
-        <TextInput
-          accessibilityLabel="Search inventory"
-          autoCapitalize="none"
-          onChangeText={setSearch}
-          placeholder="Search inventory"
-          placeholderTextColor={colors.muted}
-          style={styles.search}
-          value={search}
-        />
-      ) : null}
-      {usingCachedInventory && mode !== "Stroll" ? (
-        <View style={styles.offlineBanner}>
-          <Text style={styles.offlineTitle}>Showing saved inventory</Text>
-          <Text style={styles.offlineText}>
-            Pull back online before checkout so stock can be rechecked.
-          </Text>
+        <View style={styles.searchWrap}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            accessibilityLabel="Search inventory"
+            autoCapitalize="none"
+            onChangeText={setSearch}
+            placeholder="Search inventory"
+            placeholderTextColor={colors.muted}
+            style={styles.search}
+            value={search}
+          />
+          {search ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              onPress={() => setSearch("")}
+              style={styles.clearSearch}
+            >
+              <Text style={styles.clearSearchText}>×</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
     </View>
@@ -220,7 +226,7 @@ export function ShopScreen({ navigation }: Props) {
             product={strollProduct}
           />
         ) : (
-          <StateView title="No items found" message="Try clearing search." showMascot />
+          <NoResultsView />
         )}
       </Screen>
     );
@@ -247,11 +253,7 @@ export function ShopScreen({ navigation }: Props) {
               />
             ))
           ) : (
-            <StateView
-              title="No items found"
-              message="Stoopy did not find a match. Try another search."
-              showMascot
-            />
+            <NoResultsView />
           )}
           {productsQuery.hasNextPage ? (
             <AppButton
@@ -274,11 +276,7 @@ export function ShopScreen({ navigation }: Props) {
         keyExtractor={(item) => item.variantId}
         ListHeaderComponent={header}
         ListEmptyComponent={
-          <StateView
-            title="No items found"
-            message="Stoopy did not find a match. Try another search."
-            showMascot
-          />
+          <NoResultsView />
         }
         renderItem={({ item }) => (
           <ProductCard
@@ -334,6 +332,36 @@ function CollectionShelf({
           </View>
         ))}
       </View>
+    </View>
+  );
+}
+
+function NoResultsView() {
+  return (
+    <View style={styles.noResults}>
+      <StoopyMascot
+        caption=""
+        containerStyle={styles.noResultsMascot}
+        size="medium"
+      />
+      <Text style={styles.noResultsTitle}>Nothing matches that</Text>
+      <Text style={styles.noResultsMessage}>
+        Try a different word — inventory changes every week as new finds come in.
+      </Text>
+    </View>
+  );
+}
+
+function OfflineInventoryBanner({ compact }: { compact?: boolean }) {
+  return (
+    <View style={[styles.offlineBanner, compact && styles.offlineBannerCompact]}>
+      <Text style={styles.offlineTitle}>Offline — showing your saved inventory</Text>
+      {!compact ? (
+        <Text style={styles.offlineText}>
+          You can keep browsing and strolling saved finds. Go online before checkout so
+          stock can be rechecked.
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -526,14 +554,39 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   search: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: 16,
+    minHeight: 48,
+    paddingRight: spacing.lg
+  },
+  searchWrap: {
+    alignItems: "center",
     backgroundColor: colors.card,
     borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
-    color: colors.ink,
-    fontSize: 16,
+    flexDirection: "row",
     minHeight: 48,
-    paddingHorizontal: spacing.lg
+    paddingLeft: spacing.md
+  },
+  searchIcon: {
+    color: colors.faint,
+    fontSize: 20,
+    fontWeight: "900",
+    marginRight: spacing.sm
+  },
+  clearSearch: {
+    alignItems: "center",
+    height: 44,
+    justifyContent: "center",
+    width: 44
+  },
+  clearSearchText: {
+    color: colors.faint,
+    fontSize: 24,
+    fontWeight: "700",
+    lineHeight: 28
   },
   offlinePill: {
     backgroundColor: colors.dangerBg,
@@ -549,21 +602,53 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   offlineBanner: {
-    backgroundColor: colors.forestDark,
-    borderRadius: 8,
+    backgroundColor: colors.ink,
+    borderRadius: 0,
     gap: spacing.xs,
     padding: spacing.md
   },
+  offlineBannerCompact: {
+    marginHorizontal: -spacing.lg,
+    marginTop: -spacing.md,
+    paddingVertical: spacing.sm
+  },
   offlineTitle: {
-    color: colors.lime,
+    color: colors.card,
     fontSize: 14,
-    fontWeight: "900"
+    fontWeight: "900",
+    textAlign: "center"
   },
   offlineText: {
     color: colors.card,
     fontSize: 13,
     fontWeight: "700",
+    textAlign: "center",
     lineHeight: 18
+  },
+  noResults: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 430,
+    paddingHorizontal: spacing.xl
+  },
+  noResultsMascot: {
+    alignSelf: "center",
+    marginBottom: spacing.lg
+  },
+  noResultsTitle: {
+    color: colors.ink,
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 28,
+    textAlign: "center"
+  },
+  noResultsMessage: {
+    color: colors.muted,
+    fontSize: 16,
+    lineHeight: 23,
+    marginTop: spacing.sm,
+    maxWidth: 280,
+    textAlign: "center"
   },
   gridRow: {
     gap: spacing.md,
