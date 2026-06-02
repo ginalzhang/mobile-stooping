@@ -37,15 +37,15 @@ const styles = StyleSheet.create({
   card: {
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: colors.card,
-    borderColor: colors.border,
+    backgroundColor: "transparent",
+    borderColor: "transparent",
     borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: 0,
     gap: spacing.xs,
-    padding: spacing.sm
+    padding: 0
   },
   smallCard: {
-    padding: spacing.xs
+    padding: 0
   },
   caption: {
     color: colors.forest,
