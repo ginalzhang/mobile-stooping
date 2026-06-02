@@ -13,9 +13,8 @@ import {
 
 import { createShopifyCart, fetchProduct } from "../../api/shopify";
 import { AppButton } from "../../components/AppButton";
-import { BrandLogo } from "../../components/BrandLogo";
 import { Screen } from "../../components/Screen";
-import { StateView } from "../../components/StateView";
+import { StoopyMascot } from "../../components/StoopyMascot";
 import { DEFAULT_PICKUP, ORDER_LIMIT } from "../../constants/pickup";
 import { colors } from "../../theme/colors";
 import { spacing, typography } from "../../theme/theme";
@@ -46,11 +45,16 @@ export function CartScreen({ navigation }: Props) {
   const estimatedSavings = useMemo(
     () =>
       items.reduce(
-        (sum, item) => sum + parseRetailValue(item.product.estimatedRetailValue) * item.quantity,
+        (sum, item) =>
+          sum + parseRetailValue(item.product.estimatedRetailValue) * item.quantity,
         0
       ),
     [items]
   );
+
+  const browseShop = () => {
+    navigation.getParent()?.navigate("Shop", { screen: "ShopHome" });
+  };
 
   const checkout = async () => {
     if (!items.length) return;
@@ -116,13 +120,11 @@ export function CartScreen({ navigation }: Props) {
   if (!items.length) {
     return (
       <Screen>
-        <View style={styles.emptyBrand}>
-          <BrandLogo size="large" />
+        <View style={styles.header}>
+          <Text style={typography.h1}>Your order</Text>
+          <Text style={styles.emptyLimit}>0 of {ORDER_LIMIT} reserved</Text>
         </View>
-        <StateView
-          title="Your order is empty"
-          message="Browse the shop and add up to 10 free finds."
-        />
+        <EmptyOrder onBrowse={browseShop} />
         <PickupPolicy />
       </Screen>
     );
@@ -148,7 +150,7 @@ export function CartScreen({ navigation }: Props) {
       <View style={styles.items}>
         {items.map((item) => (
           <View key={item.product.variantId} style={styles.itemRow}>
-            {item.product.images[0] ? (
+            {item.product.images?.[0] ? (
               <Image source={{ uri: item.product.images[0] }} style={styles.thumb} />
             ) : (
               <View style={[styles.thumb, styles.thumbFallback]} />
@@ -159,11 +161,12 @@ export function CartScreen({ navigation }: Props) {
               </Text>
               <View style={styles.itemMetaRow}>
                 <Text style={styles.itemPrice}>$0</Text>
-                {item.product.estimatedRetailValue !== "Not listed" ? (
+                {item.product.estimatedRetailValue &&
+                item.product.estimatedRetailValue !== "Not listed" ? (
                   <Text style={styles.itemRetail}>{item.product.estimatedRetailValue}</Text>
                 ) : null}
                 <Text numberOfLines={1} style={styles.conditionPill}>
-                  {item.product.condition}
+                  {item.product.condition || "Good used condition"}
                 </Text>
               </View>
             </View>
@@ -238,7 +241,25 @@ function PickupPolicy() {
   );
 }
 
-function parseRetailValue(value: string) {
+function EmptyOrder({ onBrowse }: { onBrowse: () => void }) {
+  return (
+    <View style={styles.emptyState}>
+      <StoopyMascot caption="" size="medium" />
+      <Text style={styles.emptyTitle}>Your order is empty</Text>
+      <Text style={styles.emptyMessage}>
+        Browse the shop and reserve up to {ORDER_LIMIT} free finds for Sunday pickup.
+      </Text>
+      <AppButton
+        label="Browse the shop"
+        onPress={onBrowse}
+        style={styles.emptyButton}
+      />
+    </View>
+  );
+}
+
+function parseRetailValue(value?: string) {
+  if (!value) return 0;
   const match = value.match(/\$?([0-9]+(?:\.[0-9]+)?)/);
   return match ? Math.round(Number(match[1])) : 0;
 }
@@ -252,6 +273,11 @@ const styles = StyleSheet.create({
     color: colors.forest,
     fontSize: 16,
     fontWeight: "800"
+  },
+  emptyLimit: {
+    color: colors.muted,
+    fontSize: 16,
+    fontWeight: "900"
   },
   progressTrack: {
     backgroundColor: colors.paper2,
@@ -362,9 +388,31 @@ const styles = StyleSheet.create({
     marginVertical: spacing.xl,
     padding: spacing.lg
   },
-  emptyBrand: {
+  emptyState: {
     alignItems: "center",
-    marginBottom: spacing.lg
+    gap: spacing.md,
+    justifyContent: "center",
+    marginTop: spacing.xxl,
+    paddingHorizontal: spacing.xl
+  },
+  emptyTitle: {
+    color: colors.ink,
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 28,
+    marginTop: spacing.sm,
+    textAlign: "center"
+  },
+  emptyMessage: {
+    color: colors.muted,
+    fontSize: 17,
+    lineHeight: 24,
+    maxWidth: 310,
+    textAlign: "center"
+  },
+  emptyButton: {
+    marginTop: spacing.sm,
+    minWidth: 180
   },
   reminderText: {
     color: colors.muted,
