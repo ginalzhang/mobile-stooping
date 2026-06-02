@@ -244,7 +244,9 @@ function PickupPolicy() {
 function EmptyOrder({ onBrowse }: { onBrowse: () => void }) {
   return (
     <View style={styles.emptyState}>
-      <StoopyMascot caption="" size="medium" />
+      <View style={styles.emptyMascot}>
+        <StoopyMascot caption="" size="medium" />
+      </View>
       <Text style={styles.emptyTitle}>Your order is empty</Text>
       <Text style={styles.emptyMessage}>
         Browse the shop and reserve up to {ORDER_LIMIT} free finds for Sunday pickup.
@@ -394,6 +396,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: spacing.xxl,
     paddingHorizontal: spacing.xl
+  },
+  emptyMascot: {
+    alignItems: "center",
+    width: "100%"
   },
   emptyTitle: {
     color: colors.ink,
