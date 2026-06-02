@@ -292,6 +292,7 @@ function CollectionShelf({
       <ScrollView
         horizontal
         contentContainerStyle={styles.shelfRow}
+        style={styles.shelfScroller}
         showsHorizontalScrollIndicator={false}
       >
         {products.map((product) => (
@@ -558,8 +559,12 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   shelfRow: {
+    alignItems: "flex-start",
     gap: spacing.md,
     paddingRight: spacing.lg
+  },
+  shelfScroller: {
+    minHeight: 320
   },
   loadMore: {
     marginTop: spacing.sm

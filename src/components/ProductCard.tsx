@@ -98,6 +98,7 @@ function tintForCategory(category: string) {
 
 const styles = StyleSheet.create({
   card: {
+    alignSelf: "flex-start",
     backgroundColor: "transparent",
     borderColor: "transparent",
     borderRadius: 8,
@@ -106,7 +107,8 @@ const styles = StyleSheet.create({
   },
   wideCard: {
     flex: 0,
-    width: 212
+    minHeight: 308,
+    width: 164
   },
   contentPressable: {
     flex: 1
@@ -118,7 +120,8 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: 8,
     overflow: "hidden",
-    position: "relative"
+    position: "relative",
+    width: "100%"
   },
   image: {
     height: "100%",
