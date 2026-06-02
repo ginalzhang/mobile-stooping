@@ -1,6 +1,6 @@
 # Development
 
-This guide documents the Expo app inspected on `origin/stooping-club-mobile-app`.
+This guide documents the Expo React Native Stooping Club mobile app.
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ EXPO_PUBLIC_STOREFRONT_TOKEN=replace_me
 EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN=replace_me
 ```
 
-Only `EXPO_PUBLIC_SHOPIFY_DOMAIN` and `EXPO_PUBLIC_STOREFRONT_TOKEN` are required by the inspected runtime code. `EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN` is reserved for future Customer Account work.
+Only `EXPO_PUBLIC_SHOPIFY_DOMAIN` and `EXPO_PUBLIC_STOREFRONT_TOKEN` are required by the runtime code. `EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN` is reserved for future Customer Account work.
 
 Do not commit real tokens.
 
@@ -53,7 +53,7 @@ npm run typecheck
 
 This runs `tsc --noEmit`.
 
-No test, lint, format, or production build scripts were defined in the inspected `package.json`.
+No test, lint, format, or production build scripts are currently defined in `package.json`.
 
 Recommended manual smoke test:
 
@@ -92,11 +92,9 @@ Public Storefront API token used in the `X-Shopify-Storefront-Access-Token` requ
 
 ### `EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN`
 
-Present in `.env.example`, but not used by the inspected runtime code.
+Present in `.env.example`, but not used by the current runtime code.
 
-## Branch And Workspace Notes
-
-The current documentation workspace was based on `origin/main`, which had no tracked app files when inspected. The app source was found on `origin/stooping-club-mobile-app`.
+## Workspace Notes
 
 For Conductor workspaces:
 
@@ -104,7 +102,7 @@ For Conductor workspaces:
 - Run scripts run from the workspace directory.
 - Use Files to copy or `.worktreeinclude` for local `.env` files if every workspace needs the same Shopify credentials.
 - Avoid committing `.env`; the branch `.gitignore` excludes `.env` and `.env.*` while allowing `.env.example`.
-- Expo usually supports configurable ports, but the inspected app scripts do not currently wire `CONDUCTOR_PORT` into `expo start`.
+- Expo usually supports configurable ports, but the app scripts do not currently wire `CONDUCTOR_PORT` into `expo start`.
 
 If adding shared Conductor configuration after the app source is on the target branch, a conservative starting point is:
 
@@ -162,4 +160,3 @@ When changing branding, review:
 - Retail value display is present in the UI, but mapped products currently use `Not listed`.
 - Collections mode groups loaded products locally instead of fetching all collections as independent shelves.
 - Corrupt AsyncStorage JSON for cart/customer/confirmation may crash hydration because parsing is not guarded.
-

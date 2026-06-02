@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the Expo React Native app inspected on `origin/stooping-club-mobile-app`.
+This document describes the Expo React Native Stooping Club mobile app.
 
 ## App Shell
 
@@ -57,10 +57,10 @@ Important behavior:
 
 It renders:
 
-- Image carousel or `$0` fallback.
-- Title, `$0.00`, stock, condition, category, estimated retail value, and description.
+- Image carousel or branded fallback.
+- Title, `$0`, condition, availability, category, estimated retail value when available, and pickup details.
 - Add-to-order action.
-- Local pickup and image-editing/AI disclosure notes.
+- Claimed/sold-out state with disabled ordering and a keep-strolling message.
 
 When add succeeds, the screen offers to keep browsing or navigate to the Order tab.
 
@@ -231,8 +231,7 @@ The UI is mostly composed from React Native `StyleSheet` objects and centralized
 
 - `CartContext` hydrates AsyncStorage JSON without a parse guard. Corrupt local storage could crash startup.
 - `EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN` is documented in env files but not used by the current guest-checkout flow.
-- `estimatedRetailValue` is currently mapped as `Not listed`; UI logic exists for retail values but no Shopify field currently fills them.
+- `estimatedRetailValue` usually maps as `Not listed`; UI logic exists for retail values but no verified Shopify field currently fills them.
 - Collections mode groups currently loaded products by category. It is not a separate full collection browser despite collection helper functions existing.
 - Local notifications are demo-ready device reminders, not production remote push notifications.
 - No automated tests, lint script, format script, or CI config were present in the inspected branch.
-

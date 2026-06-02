@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Stooping Club",
+    "slug": "stooping-club-mobile-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "stoopingclub",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/brand/app-icon.png",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.berkeleystooping.mobile"
+    },
+    "android": {
+      "package": "org.berkeleystooping.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/adaptive-icon.png",
+        "backgroundColor": "#F4F1E8"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/brand/favicon.png"
+    },
+    "plugins": [
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/brand/splash.png",
+          "imageWidth": 220,
+          "backgroundColor": "#F4F1E8"
+        }
+      ]
+    ]
+  }
+}

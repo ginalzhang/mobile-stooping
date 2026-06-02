@@ -1,17 +1,12 @@
 # Stooping Club Mobile App
 
-Expo React Native app for browsing Stooping Club Berkeley inventory, reserving free items, opening Shopify checkout, and scheduling local pickup reminders.
-
-## Repository State
-
-At the time this documentation was written, `origin/main` contained no tracked app files. The app source inspected for this documentation lives on `origin/stooping-club-mobile-app` at commit `18a3d4e` (`Make Stoopy wrapper transparent`).
-
-If you are viewing this README on a branch that includes the app source, the paths below refer to files in that branch.
+Expo React Native + TypeScript app for browsing Stooping Club Berkeley inventory, reserving free items, opening Shopify checkout, and scheduling local pickup reminders.
 
 ## What The App Does
 
-- Shows live Shopify inventory in three browse modes: Grid, Collections, and Stroll.
-- Lets customers open product details, see stock and condition, and add free items to an order.
+- Shows live Shopify inventory in three browse modes: Grid, Collections, and randomized Stroll.
+- Falls back to cached inventory when Shopify is unavailable, including offline Stroll through saved items.
+- Lets customers open product details, see stock, condition, estimated retail value when available, and pickup details.
 - Enforces a 10-item order limit.
 - Collects customer name, email, and phone before checkout.
 - Re-checks item availability before creating a Shopify cart.
@@ -72,7 +67,9 @@ EXPO_PUBLIC_STOREFRONT_TOKEN=replace_me
 EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN=replace_me
 ```
 
-`EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN` is present for future Customer Account work, but the inspected app uses guest checkout through Shopify cart `checkoutUrl`.
+`EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN` is present for future Customer Account work, but the app uses guest checkout through Shopify cart `checkoutUrl`.
+
+Do not commit real tokens.
 
 ## Common Commands
 
@@ -84,7 +81,18 @@ npm run web        # expo start --web
 npm run typecheck  # tsc --noEmit
 ```
 
-There are no lint, test, format, or production build scripts defined in the inspected `package.json`.
+## Demo Flow
+
+1. Open the app and land on Shop.
+2. Show Grid mode with live inventory.
+3. Switch to Collections and search inventory.
+4. Switch to Stroll and show randomized one-item browsing.
+5. Search for a term with no matches to show the empty search state.
+6. Open a product, review $0 price, condition, status, and pickup details.
+7. Add up to 10 items to Order.
+8. Enter name/email/phone and confirm.
+9. Open Shopify checkout URL, return to the app, and show pickup pass/reminders.
+10. Show About tab for mission, timeline, team, branches, and customer content.
 
 ## Runtime Flow
 
@@ -95,8 +103,17 @@ There are no lint, test, format, or production build scripts defined in the insp
 5. Order validates contact info, re-fetches products to check stock, creates a Shopify cart, opens checkout, saves confirmation, and clears the cart.
 6. Confirmation shows pickup details, a QR pickup pass, item summary, and local reminder controls.
 
+## Known Limitations
+
+- Customer Account API sign-in is not implemented because store-side customer auth setup may vary. Guest checkout through Shopify Storefront cart is implemented.
+- Push notifications use Expo local notifications for demo readiness. Production push delivery would require an Expo push token service or native push backend.
+- Pickup defaults to Sunday 2-3 PM at Security Public Storage in El Cerrito and is centralized in `src/constants/pickup.ts` for seasonal updates.
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md): app structure, data flow, state, navigation, and integration details.
 - [Development](docs/DEVELOPMENT.md): setup, env vars, commands, validation, Conductor notes, and known risks.
 
+## Submission Description
+
+Stooping Club Mobile is a free-shopping mobile app for Stooping Club Berkeley. It pulls live Shopify inventory, lets users browse by grid, collection, or a playful randomized Stroll mode, supports cached offline browsing, shows standardized item status and pickup details, builds a 10-item pickup order, opens Shopify checkout, and schedules Friday confirmation and Sunday pickup reminders. The app also includes mission, story, team, branches, and customer content so judges can see both the core commerce loop and the broader reuse movement.
