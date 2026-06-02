@@ -383,12 +383,7 @@ function StrollCard({
   product: Product;
 }) {
   const image = product.images[0];
-  const descriptionStory = product.description.split(".")[0]?.trim();
-  const story = descriptionStory
-    ? `${descriptionStory}.`
-    : product.category && product.category !== "Uncategorized"
-      ? `${product.category} ready for a second life.`
-      : "Stoopy found this second-life item for its next home.";
+  const condition = product.condition || "Good used condition";
 
   return (
     <View style={styles.strollCard}>
@@ -434,9 +429,9 @@ function StrollCard({
             </Text>
           </View>
         </View>
-        <View style={styles.originBox}>
-          <Text style={styles.originLabel}>Origin story</Text>
-          <Text style={styles.originText}>{story}</Text>
+        <View style={styles.conditionBox}>
+          <Text style={styles.conditionLabel}>Condition</Text>
+          <Text style={styles.conditionText}>{condition}</Text>
         </View>
         <View style={styles.strollActions}>
           <AppButton
@@ -689,7 +684,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900"
   },
-  originBox: {
+  conditionBox: {
     backgroundColor: colors.card,
     borderColor: colors.border,
     borderRadius: 8,
@@ -697,15 +692,16 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     padding: spacing.md
   },
-  originLabel: {
+  conditionLabel: {
     color: colors.forest,
     fontSize: 12,
     fontWeight: "900",
     textTransform: "uppercase"
   },
-  originText: {
+  conditionText: {
     color: colors.ink2,
     fontSize: 15,
+    fontWeight: "800",
     lineHeight: 21
   },
   strollActions: {
