@@ -289,23 +289,18 @@ function CollectionShelf({
         <Text style={styles.shelfTitle}>{title}</Text>
         <Text style={styles.shelfCount}>{products.length} finds</Text>
       </View>
-      <ScrollView
-        horizontal
-        contentContainerStyle={styles.shelfRow}
-        style={styles.shelfScroller}
-        showsHorizontalScrollIndicator={false}
-      >
+      <View style={styles.shelfGrid}>
         {products.map((product) => (
-          <ProductCard
-            inOrder={inOrder(product)}
-            key={product.variantId}
-            onAdd={() => onAdd(product)}
-            onPress={() => onPress(product)}
-            product={product}
-            wide
-          />
+          <View key={product.variantId} style={styles.shelfCardSlot}>
+            <ProductCard
+              inOrder={inOrder(product)}
+              onAdd={() => onAdd(product)}
+              onPress={() => onPress(product)}
+              product={product}
+            />
+          </View>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -558,13 +553,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800"
   },
-  shelfRow: {
-    alignItems: "flex-start",
-    gap: spacing.md,
-    paddingRight: spacing.lg
+  shelfGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md
   },
-  shelfScroller: {
-    minHeight: 320
+  shelfCardSlot: {
+    flexBasis: "47%",
+    flexGrow: 1,
+    maxWidth: "48%"
   },
   loadMore: {
     marginTop: spacing.sm
