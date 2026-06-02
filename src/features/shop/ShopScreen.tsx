@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -35,7 +35,7 @@ const modes: BrowseMode[] = ["Grid", "Collections", "Stroll"];
 export function ShopScreen({ navigation }: Props) {
   const [mode, setMode] = useState<BrowseMode>("Grid");
   const [search, setSearch] = useState("");
-  const [strollIndex, setStrollIndex] = useState(0);
+  const [strollQueue, setStrollQueue] = useState<string[]>([]);
   const [strolledIds, setStrolledIds] = useState<string[]>([]);
   const { addItem, items } = useCart();
 
@@ -62,12 +62,36 @@ export function ShopScreen({ navigation }: Props) {
     [products]
   );
   const collectionGroups = useMemo(() => groupProductsByCategory(products), [products]);
-  const strollProduct =
-    availableProducts[strollIndex % Math.max(availableProducts.length, 1)];
+  const strollProduct = useMemo(() => {
+    const queuedId = strollQueue[0];
+    return (
+      availableProducts.find((product) => product.id === queuedId) ??
+      availableProducts[0]
+    );
+  }, [availableProducts, strollQueue]);
   const strolledAllItems =
     mode === "Stroll" &&
     availableProducts.length > 0 &&
     strolledIds.length >= availableProducts.length;
+
+  useEffect(() => {
+    if (!availableProducts.length) {
+      setStrollQueue([]);
+      setStrolledIds([]);
+      return;
+    }
+
+    setStrollQueue((currentQueue) => {
+      const availableIds = new Set(availableProducts.map((product) => product.id));
+      const validQueue = currentQueue.filter((id) => availableIds.has(id));
+      if (validQueue.length) return validQueue;
+      return shuffle(availableProducts.map((product) => product.id));
+    });
+    setStrolledIds((ids) => {
+      const availableIds = new Set(availableProducts.map((product) => product.id));
+      return ids.filter((id) => availableIds.has(id));
+    });
+  }, [availableProducts]);
   const refreshControl = (
     <RefreshControl
       refreshing={productsQuery.isRefetching}
@@ -169,7 +193,7 @@ export function ShopScreen({ navigation }: Props) {
             actionLabel="Start over"
             onAction={() => {
               setStrolledIds([]);
-              setStrollIndex(0);
+              setStrollQueue(shuffle(availableProducts.map((product) => product.id)));
             }}
             showMascot
           />
@@ -181,7 +205,16 @@ export function ShopScreen({ navigation }: Props) {
               setStrolledIds((ids) =>
                 ids.includes(strollProduct.id) ? ids : [...ids, strollProduct.id]
               );
-              setStrollIndex((index) => index + 1);
+              setStrollQueue((queue) => {
+                const remaining = queue.filter((id) => id !== strollProduct.id);
+                return remaining.length
+                  ? remaining
+                  : shuffle(
+                      availableProducts
+                        .filter((product) => product.id !== strollProduct.id)
+                        .map((product) => product.id)
+                    );
+              });
             }}
             onPress={() => openProduct(strollProduct)}
             product={strollProduct}
@@ -437,6 +470,15 @@ function groupProductsByCategory(products: Product[]) {
   return Array.from(groups.entries())
     .map(([category, groupProducts]) => ({ category, products: groupProducts }))
     .sort((a, b) => b.products.length - a.products.length || a.category.localeCompare(b.category));
+}
+
+function shuffle<T>(items: T[]) {
+  const nextItems = [...items];
+  for (let index = nextItems.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [nextItems[index], nextItems[swapIndex]] = [nextItems[swapIndex], nextItems[index]];
+  }
+  return nextItems;
 }
 
 const styles = StyleSheet.create({
