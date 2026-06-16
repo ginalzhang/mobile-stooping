@@ -7,6 +7,7 @@ import {
   type StyleProp,
   type ViewStyle
 } from "react-native";
+import Animated, { ZoomIn } from "react-native-reanimated";
 
 import { colors } from "../theme/colors";
 
@@ -41,17 +42,21 @@ export function AppButton({
       {...props}
     >
       {loading ? (
-        <ActivityIndicator color={variant === "primary" ? colors.card : colors.forest} />
+        <Animated.View key="loading" entering={ZoomIn.duration(120)}>
+          <ActivityIndicator color={variant === "primary" ? colors.card : colors.forest} />
+        </Animated.View>
       ) : (
-        <Text
-          style={[
-            styles.label,
-            variant === "primary" && styles.primaryLabel,
-            variant === "accent" && styles.accentLabel
-          ]}
-        >
-          {label}
-        </Text>
+        <Animated.View key={label} entering={ZoomIn.duration(120)}>
+          <Text
+            style={[
+              styles.label,
+              variant === "primary" && styles.primaryLabel,
+              variant === "accent" && styles.accentLabel
+            ]}
+          >
+            {label}
+          </Text>
+        </Animated.View>
       )}
     </Pressable>
   );
