@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -13,10 +13,29 @@ import {
   TextInput,
   View
 } from "react-native";
+import Animated, {
+  BounceIn,
+  BounceInRight,
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeInRight,
+  FadeOut,
+  FadeOutLeft,
+  FadeInUp,
+  LinearTransition,
+  ZoomIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming
+} from "react-native-reanimated";
 
 import { fetchProducts } from "../../api/shopify";
 import { AppButton } from "../../components/AppButton";
 import { BrandLogo } from "../../components/BrandLogo";
+import { Chip } from "../../components/Chip";
 import { ProductCard } from "../../components/ProductCard";
 import { Screen } from "../../components/Screen";
 import { StateView } from "../../components/StateView";
@@ -28,13 +47,21 @@ import { spacing, typography } from "../../theme/theme";
 import type { Product } from "../../types/product";
 
 type Props = NativeStackScreenProps<ShopStackParamList, "ShopHome">;
-type BrowseMode = "Grid" | "Collections" | "Stroll";
+type BrowseMode = "Browse" | "Stroll";
 
-const modes: BrowseMode[] = ["Grid", "Collections", "Stroll"];
+const modes: BrowseMode[] = ["Browse", "Stroll"];
+const searchResetStyle = {
+  outlineColor: "transparent",
+  outlineStyle: "solid",
+  outlineWidth: 0
+} as const;
 
 export function ShopScreen({ navigation }: Props) {
-  const [mode, setMode] = useState<BrowseMode>("Grid");
+  const [mode, setMode] = useState<BrowseMode>("Browse");
+  const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [orderToast, setOrderToast] = useState<{ id: number; message: string } | null>(null);
   const [strollQueue, setStrollQueue] = useState<string[]>([]);
   const [strolledIds, setStrolledIds] = useState<string[]>([]);
   const { addItem, items } = useCart();
@@ -47,7 +74,8 @@ export function ShopScreen({ navigation }: Props) {
     queryKey: ["products", filters],
     queryFn: ({ pageParam }) => fetchProducts({ ...filters, cursor: pageParam }),
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    initialPageParam: null as string | null
+    initialPageParam: null as string | null,
+    placeholderData: keepPreviousData
   });
 
   const products = useMemo(
@@ -61,7 +89,28 @@ export function ShopScreen({ navigation }: Props) {
     () => products.filter((product) => product.availableForSale && product.stockCount > 0),
     [products]
   );
-  const collectionGroups = useMemo(() => groupProductsByCategory(products), [products]);
+  const categoryOptions = useMemo(() => {
+    const categories = new Set(
+      products
+        .map((product) => product.category)
+        .filter((category): category is string => Boolean(category))
+    );
+    return Array.from(categories).sort((a, b) => a.localeCompare(b));
+  }, [products]);
+  const visibleProducts = useMemo(
+    () =>
+      selectedCategory
+        ? products.filter((product) => product.category === selectedCategory)
+        : products,
+    [products, selectedCategory]
+  );
+  const visibleAvailableCount = useMemo(
+    () =>
+      visibleProducts.filter(
+        (product) => product.availableForSale && product.stockCount > 0
+      ).length,
+    [visibleProducts]
+  );
   const strollProduct = useMemo(() => {
     const queuedId = strollQueue[0];
     return (
@@ -73,6 +122,14 @@ export function ShopScreen({ navigation }: Props) {
     mode === "Stroll" &&
     availableProducts.length > 0 &&
     strolledIds.length >= availableProducts.length;
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(searchText.trim());
+    }, 280);
+
+    return () => clearTimeout(timeout);
+  }, [searchText]);
 
   useEffect(() => {
     if (!availableProducts.length) {
@@ -92,6 +149,19 @@ export function ShopScreen({ navigation }: Props) {
       return ids.filter((id) => availableIds.has(id));
     });
   }, [availableProducts]);
+
+  useEffect(() => {
+    if (!selectedCategory) return;
+    if (categoryOptions.includes(selectedCategory)) return;
+    setSelectedCategory(null);
+  }, [categoryOptions, selectedCategory]);
+
+  useEffect(() => {
+    if (!orderToast) return;
+    const timeout = setTimeout(() => setOrderToast(null), 2400);
+    return () => clearTimeout(timeout);
+  }, [orderToast]);
+
   const refreshControl = (
     <RefreshControl
       refreshing={productsQuery.isRefetching}
@@ -114,7 +184,12 @@ export function ShopScreen({ navigation }: Props) {
     const result = addItem(product);
     if (!result.ok) {
       Alert.alert("Could not add item", result.message ?? "Try another find.");
+      return;
     }
+    setOrderToast({
+      id: Date.now(),
+      message: `${product.title} reserved`
+    });
   };
 
   const header = (
@@ -128,38 +203,89 @@ export function ShopScreen({ navigation }: Props) {
           </View>
         ) : null}
       </View>
-      {mode !== "Stroll" ? (
-        <>
-          <Text style={typography.h1}>Free treasures, ready{"\n"}for a good home</Text>
-          <Text style={styles.subhead}>
-            {availableProducts.length} finds available · hot items move fast
-          </Text>
-        </>
-      ) : null}
+      <View style={styles.headerCopy}>
+        <Text style={typography.h1}>Free treasures, ready{"\n"}for a good home</Text>
+        <Text style={styles.subhead}>
+          {mode === "Stroll"
+            ? "One find at a time · keep strolling for the next pick"
+            : productsQuery.isLoading
+              ? "Loading latest finds"
+              : `${visibleAvailableCount} finds available · hot items move fast`}
+        </Text>
+      </View>
       <ModeSegment mode={mode} onChange={setMode} />
-      {mode !== "Stroll" ? (
-        <View style={styles.searchWrap}>
-          <Text style={styles.searchIcon}>⌕</Text>
-          <TextInput
-            accessibilityLabel="Search inventory"
-            autoCapitalize="none"
-            onChangeText={setSearch}
-            placeholder="Search inventory"
-            placeholderTextColor={colors.muted}
-            style={styles.search}
-            value={search}
-          />
-          {search ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              onPress={() => setSearch("")}
-              style={styles.clearSearch}
+      <View style={styles.modeControls}>
+        {mode !== "Stroll" ? (
+          <View style={styles.searchWrap}>
+            <Text style={styles.searchIcon}>⌕</Text>
+            <TextInput
+              accessibilityLabel="Search inventory"
+              autoCapitalize="none"
+              autoCorrect={false}
+              cursorColor={colors.forest}
+              onChangeText={setSearchText}
+              placeholder="Search inventory"
+              placeholderTextColor={colors.muted}
+              selectionColor={colors.forest}
+              style={[styles.search, searchResetStyle]}
+              underlineColorAndroid="transparent"
+              value={searchText}
+            />
+            {searchText ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                onPress={() => {
+                  setSearchText("");
+                  setSearch("");
+                }}
+                style={styles.clearSearch}
+              >
+                <Text style={styles.clearSearchText}>×</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : (
+          <Animated.View
+            entering={BounceInRight.delay(120).duration(720)}
+            style={styles.strollModeBubble}
+          >
+            <Text style={styles.strollModeTitle}>Stoopy is picking for you.</Text>
+            <Text style={styles.strollModeText}>
+              A slower one-at-a-time browse, with no search needed.
+            </Text>
+          </Animated.View>
+        )}
+        <View style={styles.categorySlot}>
+          {mode !== "Stroll" && categoryOptions.length > 1 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryRow}
             >
-              <Text style={styles.clearSearchText}>×</Text>
-            </Pressable>
+              <Chip
+                label="All"
+                onPress={() => setSelectedCategory(null)}
+                selected={!selectedCategory}
+              />
+              {categoryOptions.map((category) => (
+                <Chip
+                  key={category}
+                  label={category}
+                  onPress={() => setSelectedCategory(category)}
+                  selected={selectedCategory === category}
+                />
+              ))}
+            </ScrollView>
           ) : null}
         </View>
+      </View>
+      {orderToast ? (
+        <OrderToast
+          key={orderToast.id}
+          message={orderToast.message}
+          onViewOrder={() => navigation.getParent()?.navigate("Order")}
+        />
       ) : null}
     </View>
   );
@@ -167,8 +293,15 @@ export function ShopScreen({ navigation }: Props) {
   if (productsQuery.isLoading) {
     return (
       <Screen scroll={false}>
-        {header}
-        <StateView title="Loading free finds" loading />
+        <FlatList
+          data={[0, 1, 2, 3, 4, 5]}
+          keyExtractor={(item) => `skeleton-${item}`}
+          ListHeaderComponent={header}
+          renderItem={({ index }) => <ProductSkeleton animationIndex={index} />}
+          numColumns={2}
+          columnWrapperStyle={styles.gridRow}
+          contentContainerStyle={styles.list}
+        />
       </Screen>
     );
   }
@@ -205,6 +338,7 @@ export function ShopScreen({ navigation }: Props) {
           />
         ) : strollProduct ? (
           <StrollCard
+            key={strollProduct.id}
             inOrder={isInOrder(strollProduct)}
             onAdd={() => addProduct(strollProduct)}
             onNext={() => {
@@ -232,54 +366,18 @@ export function ShopScreen({ navigation }: Props) {
     );
   }
 
-  if (mode === "Collections") {
-    return (
-      <Screen scroll={false}>
-        <ScrollView
-          contentContainerStyle={styles.list}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={refreshControl}
-        >
-          {header}
-          {collectionGroups.length ? (
-            collectionGroups.map((group) => (
-              <CollectionShelf
-                inOrder={isInOrder}
-                key={group.category}
-                onAdd={addProduct}
-                onPress={openProduct}
-                products={group.products}
-                title={group.category}
-              />
-            ))
-          ) : (
-            <NoResultsView />
-          )}
-          {productsQuery.hasNextPage ? (
-            <AppButton
-              label="Load more finds"
-              loading={productsQuery.isFetchingNextPage}
-              onPress={() => void productsQuery.fetchNextPage()}
-              style={styles.loadMore}
-              variant="secondary"
-            />
-          ) : null}
-        </ScrollView>
-      </Screen>
-    );
-  }
-
   return (
     <Screen scroll={false}>
       <FlatList
-        data={products}
+        data={visibleProducts}
         keyExtractor={(item) => item.variantId}
         ListHeaderComponent={header}
         ListEmptyComponent={
           <NoResultsView />
         }
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <ProductCard
+            animationIndex={index}
             inOrder={isInOrder(item)}
             onAdd={() => addProduct(item)}
             onPress={() => openProduct(item)}
@@ -301,38 +399,67 @@ export function ShopScreen({ navigation }: Props) {
   );
 }
 
-function CollectionShelf({
-  inOrder,
-  onAdd,
-  onPress,
-  products,
-  title
+function OrderToast({
+  message,
+  onViewOrder
 }: {
-  inOrder: (product: Product) => boolean;
-  onAdd: (product: Product) => void;
-  onPress: (product: Product) => void;
-  products: Product[];
-  title: string;
+  message: string;
+  onViewOrder: () => void;
 }) {
   return (
-    <View style={styles.shelf}>
-      <View style={styles.shelfHeader}>
-        <Text style={styles.shelfTitle}>{title}</Text>
-        <Text style={styles.shelfCount}>{products.length} finds</Text>
-      </View>
-      <View style={styles.shelfGrid}>
-        {products.map((product) => (
-          <View key={product.variantId} style={styles.shelfCardSlot}>
-            <ProductCard
-              inOrder={inOrder(product)}
-              onAdd={() => onAdd(product)}
-              onPress={() => onPress(product)}
-              product={product}
-            />
-          </View>
-        ))}
-      </View>
-    </View>
+    <Animated.View
+      entering={FadeIn.duration(140)}
+      exiting={FadeOut.duration(120)}
+      style={styles.orderToast}
+    >
+      <Text numberOfLines={1} style={styles.orderToastText}>
+        {message}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="View order"
+        onPress={onViewOrder}
+        style={styles.orderToastAction}
+      >
+        <Text style={styles.orderToastActionText}>View</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function ProductSkeleton({ animationIndex }: { animationIndex: number }) {
+  const opacity = useSharedValue(0.55);
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value
+  }));
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.9, {
+          duration: 680,
+          easing: Easing.inOut(Easing.quad)
+        }),
+        withTiming(0.55, {
+          duration: 680,
+          easing: Easing.inOut(Easing.quad)
+        })
+      ),
+      -1,
+      true
+    );
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(animationIndex * 35).duration(220)}
+      style={styles.skeletonCard}
+    >
+      <Animated.View style={[styles.skeletonImage, animatedStyle]} />
+      <Animated.View style={[styles.skeletonLine, styles.skeletonTitle, animatedStyle]} />
+      <Animated.View style={[styles.skeletonLine, styles.skeletonMeta, animatedStyle]} />
+      <Animated.View style={[styles.skeletonButton, animatedStyle]} />
+    </Animated.View>
   );
 }
 
@@ -414,31 +541,54 @@ function StrollCard({
   const condition = product.condition || "Good used condition";
 
   return (
-    <View style={styles.strollCard}>
+    <Animated.View
+      entering={FadeInRight.duration(520)}
+      exiting={FadeOutLeft.duration(220)}
+      layout={LinearTransition.duration(260)}
+      style={styles.strollCard}
+    >
       <View style={styles.stoopyRow}>
-        <StoopyMascot caption="" size="small" />
-        <View style={styles.speechBubble}>
-          <Text style={styles.speechTitle}>Stoopy found you something.</Text>
-          <Text style={styles.speechText}>
+        <Animated.View entering={BounceIn.delay(160).duration(760)}>
+          <StoopyMascot caption="" size="small" />
+        </Animated.View>
+        <Animated.View
+          entering={BounceInRight.delay(430).duration(760)}
+          style={styles.speechBubble}
+        >
+          <Animated.Text
+            entering={FadeIn.delay(880).duration(520)}
+            style={styles.speechTitle}
+          >
+            Stoopy found you something.
+          </Animated.Text>
+          <Animated.Text
+            entering={FadeIn.delay(1080).duration(560)}
+            style={styles.speechText}
+          >
             One second-life item at a time. Keep strolling for the next find.
-          </Text>
-        </View>
+          </Animated.Text>
+        </Animated.View>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${product.title}`}
-        onPress={onPress}
-        style={({ pressed }) => pressed && styles.pressed}
+      <Animated.View
+        entering={ZoomIn.delay(620).duration(680)}
+        style={styles.strollImageStage}
       >
-        {image ? (
-          <Image source={{ uri: image }} style={styles.strollImage} resizeMode="cover" />
-        ) : (
-          <View style={[styles.strollImage, styles.imageFallback]}>
-            <Text style={typography.h2}>$0</Text>
-          </View>
-        )}
-      </Pressable>
-      <View style={styles.strollBody}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${product.title}`}
+          onPress={onPress}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          {image ? (
+            <Image source={{ uri: image }} style={styles.strollImage} resizeMode="cover" />
+          ) : (
+            <View style={[styles.strollImage, styles.imageFallback]}>
+              <Text style={typography.h2}>$0</Text>
+            </View>
+          )}
+        </Pressable>
+      </Animated.View>
+      <Animated.View entering={FadeInUp.delay(920).duration(560)} style={styles.strollBody}>
         <Pressable onPress={onPress}>
           <Text style={typography.h2}>{product.title}</Text>
         </Pressable>
@@ -470,29 +620,15 @@ function StrollCard({
           />
           <AppButton
             disabled={inOrder}
-            label={inOrder ? "In your order" : "Add to order"}
+            label={inOrder ? "Reserved" : "Reserve"}
             onPress={onAdd}
             style={styles.strollActionButton}
             variant={inOrder ? "accent" : "primary"}
           />
         </View>
-      </View>
-    </View>
+      </Animated.View>
+    </Animated.View>
   );
-}
-
-function groupProductsByCategory(products: Product[]) {
-  const groups = new Map<string, Product[]>();
-  products.forEach((product) => {
-    const category = product.category || "Other finds";
-    const current = groups.get(category) ?? [];
-    current.push(product);
-    groups.set(category, current);
-  });
-
-  return Array.from(groups.entries())
-    .map(([category, groupProducts]) => ({ category, products: groupProducts }))
-    .sort((a, b) => b.products.length - a.products.length || a.category.localeCompare(b.category));
 }
 
 function shuffle<T>(items: T[]) {
@@ -524,6 +660,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800"
   },
+  headerCopy: {
+    gap: spacing.md
+  },
   segment: {
     backgroundColor: colors.paper2,
     borderRadius: 999,
@@ -548,10 +687,9 @@ const styles = StyleSheet.create({
   segmentSelectedLabel: {
     color: colors.card
   },
-  modeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm
+  modeControls: {
+    gap: spacing.sm,
+    minHeight: 96
   },
   search: {
     color: colors.ink,
@@ -587,6 +725,60 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     lineHeight: 28
+  },
+  categorySlot: {
+    minHeight: 36
+  },
+  categoryRow: {
+    gap: spacing.sm,
+    paddingRight: spacing.lg
+  },
+  strollModeBubble: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: spacing.md
+  },
+  strollModeTitle: {
+    color: colors.forest,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  strollModeText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18
+  },
+  orderToast: {
+    alignItems: "center",
+    backgroundColor: colors.ink,
+    borderRadius: 8,
+    flexDirection: "row",
+    gap: spacing.md,
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
+  },
+  orderToastText: {
+    color: colors.card,
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  orderToastAction: {
+    backgroundColor: colors.lime,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs
+  },
+  orderToastActionText: {
+    color: colors.limeInk,
+    fontSize: 13,
+    fontWeight: "900"
   },
   offlinePill: {
     backgroundColor: colors.dangerBg,
@@ -654,45 +846,44 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.md
   },
-  shelf: {
-    gap: spacing.md,
-    marginBottom: spacing.xl
+  skeletonCard: {
+    flex: 1
   },
-  shelfHeader: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing.md
+  skeletonImage: {
+    aspectRatio: 1,
+    backgroundColor: colors.paper2,
+    borderRadius: 8,
+    width: "100%"
   },
-  shelfTitle: {
-    color: colors.ink,
-    flex: 1,
-    fontSize: 20,
-    fontWeight: "900"
+  skeletonLine: {
+    backgroundColor: colors.paper2,
+    borderRadius: 999
   },
-  shelfCount: {
-    color: colors.muted,
-    fontSize: 13,
-    fontWeight: "800"
+  skeletonTitle: {
+    height: 16,
+    marginTop: spacing.md,
+    width: "88%"
   },
-  shelfGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md
+  skeletonMeta: {
+    height: 14,
+    marginTop: spacing.sm,
+    width: "48%"
   },
-  shelfCardSlot: {
-    flexBasis: "47%",
-    flexGrow: 1,
-    maxWidth: "48%"
-  },
-  loadMore: {
-    marginTop: spacing.sm
+  skeletonButton: {
+    backgroundColor: colors.paper2,
+    borderRadius: 8,
+    height: 40,
+    marginTop: spacing.md,
+    width: "100%"
   },
   pressed: {
     opacity: 0.8
   },
   strollCard: {
     gap: spacing.md
+  },
+  strollImageStage: {
+    width: "100%"
   },
   strollImage: {
     aspectRatio: 1,

@@ -1,8 +1,16 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import type { ComponentType } from "react";
+import { useEffect, useRef, type ComponentType } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming
+} from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
 import { CartScreen } from "../features/cart/CartScreen";
@@ -100,10 +108,8 @@ export function AppNavigator() {
             return (
               <View>
                 <TabIcon color={color} name={route.name} />
-                {route.name === "Order" && totalQuantity > 0 ? (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{totalQuantity}</Text>
-                  </View>
+                {route.name === "Order" ? (
+                  <CartBadge totalQuantity={totalQuantity} />
                 ) : null}
               </View>
             );
@@ -115,6 +121,76 @@ export function AppNavigator() {
         <Tab.Screen component={AboutNavigator} name="About" />
       </Tab.Navigator>
     </NavigationContainer>
+  );
+}
+
+function CartBadge({ totalQuantity }: { totalQuantity: number }) {
+  const badgeOpacity = useSharedValue(totalQuantity > 0 ? 1 : 0);
+  const badgeScale = useSharedValue(totalQuantity > 0 ? 1 : 0.82);
+  const hasMounted = useRef(false);
+  const previousQuantity = useRef(totalQuantity);
+  const animatedBadgeStyle = useAnimatedStyle(() => ({
+    opacity: badgeOpacity.value,
+    transform: [{ scale: badgeScale.value }]
+  }));
+
+  useEffect(() => {
+    const previous = previousQuantity.current;
+
+    previousQuantity.current = totalQuantity;
+
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      badgeOpacity.value = totalQuantity > 0 ? 1 : 0;
+      badgeScale.value = totalQuantity > 0 ? 1 : 0.82;
+      return;
+    }
+
+    cancelAnimation(badgeOpacity);
+    cancelAnimation(badgeScale);
+
+    if (totalQuantity <= 0) {
+      badgeOpacity.value = withTiming(0, {
+        duration: 120,
+        easing: Easing.out(Easing.quad)
+      });
+      badgeScale.value = withTiming(0.82, {
+        duration: 120,
+        easing: Easing.out(Easing.quad)
+      });
+      return;
+    }
+
+    badgeOpacity.value = previous > 0 ? 0.9 : 0;
+    badgeScale.value = previous > 0 ? 0.94 : 0.82;
+    badgeOpacity.value = withTiming(1, {
+      duration: 110,
+      easing: Easing.out(Easing.quad)
+    });
+    badgeScale.value = withSequence(
+      withTiming(1.12, {
+        duration: 110,
+        easing: Easing.out(Easing.quad)
+      }),
+      withTiming(1, {
+        duration: 130,
+        easing: Easing.out(Easing.cubic)
+      })
+    );
+  }, [badgeOpacity, badgeScale, totalQuantity]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.badge,
+        animatedBadgeStyle
+      ]}
+    >
+      {totalQuantity > 0 ? (
+        <Text style={styles.badgeText}>{totalQuantity}</Text>
+      ) : null}
+    </Animated.View>
   );
 }
 
