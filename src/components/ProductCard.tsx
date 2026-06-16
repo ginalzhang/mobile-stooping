@@ -1,4 +1,10 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  FadeInDown,
+  FadeOut,
+  LinearTransition,
+  ZoomIn
+} from "react-native-reanimated";
 
 import { AppButton } from "./AppButton";
 import { colors } from "../theme/colors";
@@ -11,6 +17,7 @@ type ProductCardProps = {
   onAdd?: () => void;
   inOrder?: boolean;
   wide?: boolean;
+  animationIndex?: number;
 };
 
 export function ProductCard({
@@ -18,22 +25,29 @@ export function ProductCard({
   onPress,
   onAdd,
   inOrder,
-  wide
+  wide,
+  animationIndex = 0
 }: ProductCardProps) {
   const image = product.images[0];
   const isAvailable = product.availableForSale && product.stockCount > 0;
-  const stockLabel = !isAvailable
+  const urgentStatus = !isAvailable
     ? "Claimed"
     : product.stockCount === 1
       ? "Last one"
-      : `${product.stockCount} left`;
+      : null;
   const fallbackLabel = product.category?.slice(0, 2).toUpperCase() || "$0";
   const imageTint = tintForCategory(product.category);
   const showRetail =
     product.estimatedRetailValue && product.estimatedRetailValue !== "Not listed";
+  const actionLabel = !isAvailable ? "Claimed" : inOrder ? "Reserved" : "Reserve";
 
   return (
-    <View style={[styles.card, wide && styles.wideCard]}>
+    <Animated.View
+      entering={FadeInDown.delay(Math.min(animationIndex, 8) * 30).duration(220)}
+      exiting={FadeOut.duration(120)}
+      layout={LinearTransition.duration(180)}
+      style={[styles.card, wide && styles.wideCard]}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${product.title}, ${isAvailable ? "available" : "claimed"}`}
@@ -49,16 +63,15 @@ export function ProductCard({
               <Text style={styles.placeholderBrand}>STOOPING CLUB</Text>
             </View>
           )}
-          <View style={styles.heartBadge}>
-            <Text style={styles.heartText}>♡</Text>
-          </View>
         </View>
         <View style={styles.body}>
-          <View style={[styles.badge, !isAvailable && styles.badgeMuted]}>
-            <Text style={[styles.badgeText, !isAvailable && styles.badgeMutedText]}>
-              {stockLabel}
-            </Text>
-          </View>
+          {urgentStatus ? (
+            <View style={[styles.badge, !isAvailable && styles.badgeMuted]}>
+              <Text style={[styles.badgeText, !isAvailable && styles.badgeMutedText]}>
+                {urgentStatus}
+              </Text>
+            </View>
+          ) : null}
           <Text numberOfLines={2} style={styles.title}>
             {product.title}
           </Text>
@@ -73,17 +86,17 @@ export function ProductCard({
         </View>
       </Pressable>
       {onAdd ? (
-        <View style={styles.actionWrap}>
+        <Animated.View key={actionLabel} entering={ZoomIn.duration(150)} style={styles.actionWrap}>
           <AppButton
             disabled={!isAvailable || inOrder}
-            label={!isAvailable ? "Claimed" : inOrder ? "In your order" : "Add to order"}
+            label={actionLabel}
             onPress={onAdd}
             style={styles.addButton}
             variant={inOrder ? "accent" : "primary"}
           />
-        </View>
+        </Animated.View>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -147,23 +160,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: spacing.sm
   },
-  heartBadge: {
-    alignItems: "center",
-    backgroundColor: colors.card,
-    borderRadius: 999,
-    height: 34,
-    justifyContent: "center",
-    position: "absolute",
-    right: spacing.sm,
-    top: spacing.sm,
-    width: 34
-  },
-  heartText: {
-    color: colors.muted,
-    fontSize: 24,
-    fontWeight: "800",
-    lineHeight: 28
-  },
   badge: {
     alignSelf: "flex-start",
     backgroundColor: colors.lowStockBg,
@@ -190,6 +186,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 14,
     fontWeight: "900",
+    lineHeight: 18,
     minHeight: 36
   },
   metaRow: {
