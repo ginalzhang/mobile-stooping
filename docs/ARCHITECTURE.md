@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the Expo React Native app inspected on `origin/stooping-club-mobile-app`.
+This document describes the Expo React Native Stooping Club mobile app.
 
 ## App Shell
 
@@ -50,6 +50,8 @@ Important behavior:
 - Search is sent through the Shopify product query.
 - Available products are filtered to `availableForSale && stockCount > 0`.
 - Cached inventory is surfaced with an Offline pill/banner when any page came from cache.
+- Product cards show a FREE badge, stock label, condition, `$0`, and pickup-only copy. There is no local saved/favorite state.
+- Empty search and no-inventory states use different copy so judges can distinguish a filtered miss from a claimed-out drop.
 
 ### Product Detail
 
@@ -57,10 +59,10 @@ Important behavior:
 
 It renders:
 
-- Image carousel or `$0` fallback.
-- Title, `$0.00`, stock, condition, category, estimated retail value, and description.
+- Image carousel with a page counter or branded fallback.
+- Title, `$0`, condition, availability, category, estimated retail value when available, pickup details, trust rows, and item notes.
 - Add-to-order action.
-- Local pickup and image-editing/AI disclosure notes.
+- Claimed/sold-out state with disabled ordering and a keep-strolling message.
 
 When add succeeds, the screen offers to keep browsing or navigate to the Order tab.
 
@@ -121,9 +123,9 @@ Notification code lives in `src/features/notifications/`.
 - Reads and requests notification permissions.
 - Configures an Android notification channel.
 - Cancels existing Stooping reminder notifications.
-- Schedules two repeating local reminders:
-  - Friday at 9:00 AM America/Los_Angeles
-  - Sunday at 10:00 AM America/Los_Angeles
+- Schedules one-shot local reminders for the specific pickup:
+  - Friday confirmation reminder at 9:00 AM America/Los_Angeles when still upcoming
+  - Sunday pickup reminder at 10:00 AM America/Los_Angeles when still upcoming
 
 `NotificationPermissionCard.tsx` renders permission state, reminder schedule details, enable/refresh/cancel actions, and a settings link when notifications are denied or unavailable.
 
@@ -139,6 +141,8 @@ Notification code lives in `src/features/notifications/`.
 - story timeline
 - team members
 - branch director steps
+- trust principles
+- customer testimonials
 
 The About screen opens `mailto:hello@stooping.club` for branch director and volunteer actions.
 
@@ -229,10 +233,10 @@ The UI is mostly composed from React Native `StyleSheet` objects and centralized
 
 ## Known Technical Risks
 
-- `CartContext` hydrates AsyncStorage JSON without a parse guard. Corrupt local storage could crash startup.
+- `CartContext` guards AsyncStorage hydration and ignores malformed cart/customer/confirmation records.
 - `EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN` is documented in env files but not used by the current guest-checkout flow.
-- `estimatedRetailValue` is currently mapped as `Not listed`; UI logic exists for retail values but no Shopify field currently fills them.
+- `estimatedRetailValue` usually maps as `Not listed`; UI logic exists for retail values but no verified Shopify field currently fills them.
 - Collections mode groups currently loaded products by category. It is not a separate full collection browser despite collection helper functions existing.
-- Local notifications are demo-ready device reminders, not production remote push notifications.
+- Saved/favorite items are intentionally not implemented in the current demo.
+- Local notifications are order-specific demo-ready device reminders, not production remote push notifications.
 - No automated tests, lint script, format script, or CI config were present in the inspected branch.
-

@@ -1,0 +1,21 @@
+export const colors = {
+  forest: "#2E5D1E",
+  forestDark: "#244A18",
+  cream: "#F4F1E8",
+  paper2: "#EDE8DA",
+  card: "#FFFFFF",
+  lime: "#CDE85F",
+  limeInk: "#39470F",
+  moss: "#5B6B3A",
+  rust: "#C96345",
+  ink: "#1A1A17",
+  ink2: "#3A382F",
+  muted: "#75726A",
+  faint: "#A9A69B",
+  border: "rgba(40,38,28,0.10)",
+  danger: "#BC4A2E",
+  dangerBg: "#F6E5DD",
+  lowStock: "#9A5B12",
+  lowStockBg: "#F6ECD7",
+  success: "#2E7D32"
+};

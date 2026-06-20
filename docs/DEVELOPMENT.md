@@ -1,6 +1,6 @@
 # Development
 
-This guide documents the Expo app inspected on `origin/stooping-club-mobile-app`.
+This guide documents the Expo React Native Stooping Club mobile app.
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ EXPO_PUBLIC_STOREFRONT_TOKEN=replace_me
 EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN=replace_me
 ```
 
-Only `EXPO_PUBLIC_SHOPIFY_DOMAIN` and `EXPO_PUBLIC_STOREFRONT_TOKEN` are required by the inspected runtime code. `EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN` is reserved for future Customer Account work.
+Only `EXPO_PUBLIC_SHOPIFY_DOMAIN` and `EXPO_PUBLIC_STOREFRONT_TOKEN` are required by the runtime code. `EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN` is reserved for future Customer Account work.
 
 Do not commit real tokens.
 
@@ -53,7 +53,7 @@ npm run typecheck
 
 This runs `tsc --noEmit`.
 
-No test, lint, format, or production build scripts were defined in the inspected `package.json`.
+No test, lint, format, or production build scripts are currently defined in `package.json`.
 
 Recommended manual smoke test:
 
@@ -61,14 +61,17 @@ Recommended manual smoke test:
 2. Confirm Shop loads live products.
 3. Search inventory.
 4. Switch between Grid, Collections, and Stroll.
-5. Open a product detail screen.
-6. Add one item to the order.
-7. Confirm the Order tab badge updates.
-8. Enter valid name, email, and phone.
-9. Start checkout and confirm Shopify checkout opens.
-10. Return to the app and confirm the pickup pass appears.
-11. Enable and cancel pickup reminders.
-12. Restart the app and confirm persisted customer/confirmation behavior is acceptable.
+5. Search for a term with no matches and confirm the empty search copy is specific.
+6. Open a product detail screen.
+7. Swipe through product photos and confirm the image counter updates when multiple photos are present.
+8. Confirm `$0`, pickup-only, condition, status, and reuse trust copy are visible.
+9. Add one item to the order.
+10. Confirm the Order tab badge updates.
+11. Enter valid name, email, and phone.
+12. Start checkout and confirm Shopify checkout opens.
+13. Return to the app and confirm the pickup pass appears.
+14. Enable and cancel pickup reminders.
+15. Restart the app and confirm persisted customer/confirmation behavior is acceptable.
 
 ## Environment Variables
 
@@ -92,11 +95,9 @@ Public Storefront API token used in the `X-Shopify-Storefront-Access-Token` requ
 
 ### `EXPO_PUBLIC_CUSTOMER_ACCOUNT_TOKEN`
 
-Present in `.env.example`, but not used by the inspected runtime code.
+Present in `.env.example`, but not used by the current runtime code.
 
-## Branch And Workspace Notes
-
-The current documentation workspace was based on `origin/main`, which had no tracked app files when inspected. The app source was found on `origin/stooping-club-mobile-app`.
+## Workspace Notes
 
 For Conductor workspaces:
 
@@ -104,7 +105,7 @@ For Conductor workspaces:
 - Run scripts run from the workspace directory.
 - Use Files to copy or `.worktreeinclude` for local `.env` files if every workspace needs the same Shopify credentials.
 - Avoid committing `.env`; the branch `.gitignore` excludes `.env` and `.env.*` while allowing `.env.example`.
-- Expo usually supports configurable ports, but the inspected app scripts do not currently wire `CONDUCTOR_PORT` into `expo start`.
+- Expo usually supports configurable ports, but the app scripts do not currently wire `CONDUCTOR_PORT` into `expo start`.
 
 If adding shared Conductor configuration after the app source is on the target branch, a conservative starting point is:
 
@@ -161,5 +162,5 @@ When changing branding, review:
 - Product cache fallback helps browsing after a failed live fetch, but checkout still needs live Shopify availability checks.
 - Retail value display is present in the UI, but mapped products currently use `Not listed`.
 - Collections mode groups loaded products locally instead of fetching all collections as independent shelves.
-- Corrupt AsyncStorage JSON for cart/customer/confirmation may crash hydration because parsing is not guarded.
-
+- Saved/favorite items are not implemented; product cards use a FREE badge instead of a noninteractive heart.
+- Corrupt AsyncStorage JSON for cart/customer/confirmation should be ignored during guarded hydration.
