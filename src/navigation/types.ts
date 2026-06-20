@@ -7,7 +7,11 @@ export type ShopStackParamList = {
 
 export type OrderStackParamList = {
   OrderHome: undefined;
-  Confirmation: undefined;
+  Confirmation:
+    | {
+        reservationId?: string;
+      }
+    | undefined;
 };
 
 export type AboutStackParamList = {

@@ -66,7 +66,7 @@ Recommended manual smoke test:
 7. Confirm the Order tab badge updates.
 8. Enter valid name, email, and phone.
 9. Start checkout and confirm Shopify checkout opens.
-10. Return to the app and confirm the pickup pass appears.
+10. Return to the app and confirm the name-based pickup reminder appears.
 11. Enable and cancel pickup reminders.
 12. Restart the app and confirm persisted customer/confirmation behavior is acceptable.
 

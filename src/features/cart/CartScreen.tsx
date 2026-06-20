@@ -11,11 +11,20 @@ import {
   View
 } from "react-native";
 
+import {
+  createReservation,
+  releaseReservation,
+  type Reservation
+} from "../../api/reservations";
 import { createShopifyCart, fetchProduct } from "../../api/shopify";
 import { AppButton } from "../../components/AppButton";
 import { Screen } from "../../components/Screen";
 import { StoopyMascot } from "../../components/StoopyMascot";
 import { DEFAULT_PICKUP, ORDER_LIMIT } from "../../constants/pickup";
+import {
+  getStoopingPushToken,
+  scheduleStoopingReminderNotifications
+} from "../notifications/notificationUtils";
 import { colors } from "../../theme/colors";
 import { spacing, typography } from "../../theme/theme";
 import type { OrderStackParamList } from "../../navigation/types";
@@ -38,9 +47,10 @@ export function CartScreen({ navigation }: Props) {
   const [phone, setPhone] = useState(customer.phone);
   const [checkingOut, setCheckingOut] = useState(false);
 
+  const e164Phone = useMemo(() => normalizePhoneToE164(phone), [phone]);
   const customerValid = useMemo(
-    () => name.trim() && email.includes("@") && phone.trim().length >= 7,
-    [email, name, phone]
+    () => Boolean(name.trim() && email.includes("@") && e164Phone),
+    [email, e164Phone, name]
   );
   const estimatedSavings = useMemo(
     () =>
@@ -63,6 +73,12 @@ export function CartScreen({ navigation }: Props) {
       return;
     }
 
+    if (items.some((item) => item.quantity !== 1)) {
+      Alert.alert("Quantity limit", "Each find can only be reserved once.");
+      return;
+    }
+
+    let heldReservation: Reservation | null = null;
     setCheckingOut(true);
     try {
       const latestProducts = await Promise.all(
@@ -86,9 +102,22 @@ export function CartScreen({ navigation }: Props) {
       const nextCustomer = {
         email: email.trim(),
         name: name.trim(),
-        phone: phone.trim()
+        phone: e164Phone ?? phone.trim()
       };
       setCustomer(nextCustomer);
+      const pushToken = await getStoopingPushToken();
+
+      heldReservation = await createReservation({
+        name: nextCustomer.name,
+        email: nextCustomer.email,
+        phone: nextCustomer.phone,
+        pushToken,
+        items: items.map((item) => ({
+          productId: item.product.id,
+          variantId: item.product.variantId,
+          title: item.product.title
+        }))
+      });
 
       const cart = await createShopifyCart({
         customer: nextCustomer,
@@ -100,15 +129,26 @@ export function CartScreen({ navigation }: Props) {
         await WebBrowser.openBrowserAsync(cart.checkoutUrl);
       }
 
+      await scheduleStoopingReminderNotifications();
+
       setConfirmation({
         checkoutUrl: cart.checkoutUrl,
         confirmedAt: new Date().toISOString(),
+        confirmBy: heldReservation.confirmBy,
         customer: nextCustomer,
-        items
+        items,
+        passCode: heldReservation.passCode,
+        pickupAt: heldReservation.pickupAt,
+        reservationId: heldReservation.id,
+        reservationStatus: heldReservation.status
       });
       clearCart();
-      navigation.navigate("Confirmation");
+      navigation.navigate("Confirmation", { reservationId: heldReservation.id });
     } catch (error) {
+      if (heldReservation) {
+        await releaseReservation(heldReservation.id).catch(() => undefined);
+      }
+
       const message =
         error instanceof Error ? error.message : "Checkout could not be started.";
       Alert.alert("Checkout failed", message);
@@ -219,7 +259,7 @@ export function CartScreen({ navigation }: Props) {
         onPress={checkout}
       />
       <Text style={styles.reminderText}>
-        We’ll text a reminder Friday to confirm, and Sunday before pickup.
+        We’ll send a notification Friday to confirm, and Sunday before pickup.
       </Text>
     </Screen>
   );
@@ -233,9 +273,9 @@ function PickupPolicy() {
         {DEFAULT_PICKUP.window} at {DEFAULT_PICKUP.address}.
       </Text>
       <Text style={typography.body}>
-        Local pickup only. Reply to the Friday confirmation reminder or items may be
-        relisted. Repeated no-shows may lead to suspension. Reselling Stooping Club
-        items is not allowed.
+        Local pickup only. Confirm when reminded so the team knows to expect you.
+        Repeated no-shows may lead to suspension. Reselling Stooping Club items is not
+        allowed.
       </Text>
     </View>
   );
@@ -247,6 +287,7 @@ function EmptyOrder({ onBrowse }: { onBrowse: () => void }) {
       <StoopyMascot
         caption=""
         containerStyle={styles.emptyMascot}
+        mood="sad"
         size="medium"
       />
       <Text style={styles.emptyTitle}>Your order is empty</Text>
@@ -266,6 +307,26 @@ function parseRetailValue(value?: string) {
   if (!value) return 0;
   const match = value.match(/\$?([0-9]+(?:\.[0-9]+)?)/);
   return match ? Math.round(Number(match[1])) : 0;
+}
+
+function normalizePhoneToE164(value: string): string | null {
+  const trimmed = value.trim();
+
+  if (/^\+[1-9]\d{6,14}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const digits = trimmed.replace(/\D/g, "");
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+${digits}`;
+  }
+
+  return null;
 }
 
 const styles = StyleSheet.create({

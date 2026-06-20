@@ -11,7 +11,7 @@ Expo React Native + TypeScript app for browsing Stooping Club Berkeley inventory
 - Collects customer name, email, and phone before checkout.
 - Re-checks item availability before creating a Shopify cart.
 - Opens Shopify checkout with `expo-web-browser`.
-- Stores a local confirmation, pickup pass, QR code, and reminder controls.
+- Stores a local confirmation, name-based pickup details, and reminder controls.
 - Schedules local Expo notifications for Friday confirmation and Sunday pickup reminders.
 - Includes an About tab with mission, impact, team, branch, and customer content.
 
@@ -91,7 +91,7 @@ npm run typecheck  # tsc --noEmit
 6. Open a product, review $0 price, condition, status, and pickup details.
 7. Add up to 10 items to Order.
 8. Enter name/email/phone and confirm.
-9. Open Shopify checkout URL, return to the app, and show pickup pass/reminders.
+9. Open Shopify checkout URL, return to the app, and show name-based pickup reminders.
 10. Show About tab for mission, timeline, team, branches, and customer content.
 
 ## Runtime Flow
@@ -101,7 +101,7 @@ npm run typecheck  # tsc --noEmit
 3. `AppNavigator` renders three bottom tabs: Shop, Order, and About.
 4. Shop fetches live Shopify products, falls back to cached products when available, and supports Grid, Collections, and Stroll modes.
 5. Order validates contact info, re-fetches products to check stock, creates a Shopify cart, opens checkout, saves confirmation, and clears the cart.
-6. Confirmation shows pickup details, a QR pickup pass, item summary, and local reminder controls.
+6. Confirmation shows pickup details, the customer name to give on arrival, item summary, and local reminder controls.
 
 ## Known Limitations
 

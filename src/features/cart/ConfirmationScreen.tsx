@@ -1,7 +1,14 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { StyleSheet, Text, View } from "react-native";
-import QRCode from "react-native-qrcode-svg";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
+import {
+  confirmReservation,
+  getReservation,
+  releaseReservation,
+  type Reservation,
+  type ReservationStatus
+} from "../../api/reservations";
 import { AppButton } from "../../components/AppButton";
 import { Screen } from "../../components/Screen";
 import { StateView } from "../../components/StateView";
@@ -15,10 +22,39 @@ import { useCart } from "./CartContext";
 
 type Props = NativeStackScreenProps<OrderStackParamList, "Confirmation">;
 
-export function ConfirmationScreen({ navigation }: Props) {
+export function ConfirmationScreen({ navigation, route }: Props) {
   const { confirmation } = useCart();
+  const reservationId = route.params?.reservationId ?? confirmation?.reservationId;
+  const [reservation, setReservation] = useState<Reservation | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState(false);
+  const [actionLoading, setActionLoading] = useState<"confirm" | "release" | null>(null);
 
-  if (!confirmation) {
+  const refreshReservation = useCallback(async () => {
+    if (!reservationId) return;
+
+    setLoadingStatus(true);
+    try {
+      setReservation(await getReservation(reservationId));
+    } catch {
+      // The local pass remains useful if the status check is temporarily unavailable.
+    } finally {
+      setLoadingStatus(false);
+    }
+  }, [reservationId]);
+
+  useEffect(() => {
+    void refreshReservation();
+
+    if (!reservationId) return undefined;
+
+    const interval = setInterval(() => {
+      void refreshReservation();
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [refreshReservation, reservationId]);
+
+  if (!confirmation && !reservationId) {
     return (
       <Screen>
         <StateView
@@ -31,28 +67,96 @@ export function ConfirmationScreen({ navigation }: Props) {
     );
   }
 
-  const orderCode = createOrderCode(confirmation.confirmedAt);
-  const itemCount = confirmation.items.reduce((sum, item) => sum + item.quantity, 0);
+  const itemCount =
+    confirmation?.items.reduce((sum, item) => sum + item.quantity, 0) ??
+    reservation?.items?.length ??
+    0;
+  const status = reservation?.status ?? confirmation?.reservationStatus ?? "held";
+  const statusCopy = getStatusCopy(status, reservation?.pickupAt ?? confirmation?.pickupAt);
+  const canConfirm = status === "held" && Boolean(reservationId);
+  const canRelease = (status === "held" || status === "confirmed") && Boolean(reservationId);
+
+  const handleConfirm = async () => {
+    if (!reservationId) return;
+
+    setActionLoading("confirm");
+    try {
+      setReservation(await confirmReservation(reservationId));
+    } catch (error) {
+      Alert.alert(
+        "Could not confirm",
+        error instanceof Error ? error.message : "Try again in a moment."
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRelease = () => {
+    if (!reservationId) return;
+
+    Alert.alert(
+      "Release these finds?",
+      "They will go back up for other neighbors.",
+      [
+        { text: "Keep hold", style: "cancel" },
+        {
+          text: "Release",
+          style: "destructive",
+          onPress: () => {
+            void releaseCurrentReservation(reservationId);
+          }
+        }
+      ]
+    );
+  };
+
+  const releaseCurrentReservation = async (id: string) => {
+    setActionLoading("release");
+    try {
+      setReservation(await releaseReservation(id));
+    } catch (error) {
+      Alert.alert(
+        "Could not release",
+        error instanceof Error ? error.message : "Try again in a moment."
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   return (
     <Screen>
       <View style={styles.hero}>
         <StoopyMascot caption="Pickup pal" size="small" />
         <Text style={styles.check}>✓</Text>
-        <Text style={typography.h1}>Order started</Text>
-        <Text style={typography.body}>
-          Finish Shopify checkout if it opened, then watch for Stooping Club’s text or
-          email confirmation.
-        </Text>
+        <Text style={typography.h1}>{statusCopy.title}</Text>
+        <Text style={typography.body}>{statusCopy.message}</Text>
       </View>
       <View style={styles.card}>
-        <Text style={typography.h2}>Pickup</Text>
+        <View style={styles.cardHeader}>
+          <Text style={typography.h2}>Pickup</Text>
+          {loadingStatus ? <Text style={styles.syncText}>Syncing</Text> : null}
+        </View>
         <Text style={typography.body}>
           {DEFAULT_PICKUP.window} at {DEFAULT_PICKUP.address}
         </Text>
-        <Text style={typography.body}>
-          Reply by Friday end of day or your order may be canceled and relisted.
-        </Text>
+        <Text style={typography.body}>{statusCopy.detail}</Text>
+        {canConfirm ? (
+          <AppButton
+            label="I'll be there"
+            loading={actionLoading === "confirm"}
+            onPress={handleConfirm}
+          />
+        ) : null}
+        {canRelease ? (
+          <AppButton
+            label="Can't make it - release my finds"
+            loading={actionLoading === "release"}
+            onPress={handleRelease}
+            variant="danger"
+          />
+        ) : null}
       </View>
       <View style={styles.pass}>
         <View style={styles.passHeader}>
@@ -63,19 +167,10 @@ export function ConfirmationScreen({ navigation }: Props) {
           <StoopyMascot caption="" size="small" />
         </View>
         <View style={styles.passBody}>
-          <View style={styles.qrBox}>
-            <QRCode
-              value={JSON.stringify({
-                code: orderCode,
-                pickup: DEFAULT_PICKUP.label,
-                items: itemCount
-              })}
-              size={132}
-              color={colors.ink}
-              backgroundColor={colors.card}
-            />
-          </View>
-          <Text style={styles.orderCode}>{orderCode}</Text>
+          <Text style={styles.pickupName}>
+            {confirmation?.customer.name ?? "Your name"}
+          </Text>
+          <Text style={styles.codeHelp}>Give your name when you arrive.</Text>
           <View style={styles.passMeta}>
             <PassCol label="When" value={DEFAULT_PICKUP.window} />
             <PassCol label="Where" value="El Cerrito" />
@@ -83,14 +178,16 @@ export function ConfirmationScreen({ navigation }: Props) {
           </View>
         </View>
       </View>
-      <View style={styles.card}>
-        <Text style={typography.h2}>Items</Text>
-        {confirmation.items.map((item) => (
-          <Text key={item.product.variantId} style={typography.body}>
-            {item.quantity} × {item.product.title}
-          </Text>
-        ))}
-      </View>
+      {confirmation?.items.length ? (
+        <View style={styles.card}>
+          <Text style={typography.h2}>Items</Text>
+          {confirmation.items.map((item) => (
+            <Text key={item.product.variantId} style={typography.body}>
+              {item.quantity} x {item.product.title}
+            </Text>
+          ))}
+        </View>
+      ) : null}
       <NotificationPanel />
       <AppButton
         label="Back to order"
@@ -110,12 +207,35 @@ function PassCol({ label, value }: { label: string; value: string }) {
   );
 }
 
-function createOrderCode(confirmedAt: string): string {
-  const timestamp = Number.isFinite(Date.parse(confirmedAt))
-    ? Date.parse(confirmedAt)
-    : Date.now();
+function getStatusCopy(
+  status: ReservationStatus | string,
+  pickupAt?: string
+): { title: string; message: string; detail: string } {
+  if (status === "released") {
+    return {
+      title: "Released",
+      message: "These finds were released from your order.",
+      detail: "They can now be claimed by other neighbors."
+    };
+  }
 
-  return `STOOP-${Math.abs(timestamp).toString(36).slice(-6).toUpperCase()}`;
+  if (status === "confirmed") {
+    const pickupStarted = pickupAt ? Date.now() >= Date.parse(pickupAt) : false;
+
+    return {
+      title: pickupStarted ? "Pickup today" : "Confirmed",
+      message: pickupStarted
+        ? "Give your name at pickup today."
+        : "You are confirmed for Sunday pickup.",
+      detail: "Give your name when you arrive. If plans change, release your finds."
+    };
+  }
+
+  return {
+    title: "Confirm by Friday",
+    message: "Use the Friday notification or tap below to keep your finds.",
+    detail: "The team handles any release or relisting manually."
+  };
 }
 
 const styles = StyleSheet.create({
@@ -138,6 +258,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.lg,
     padding: spacing.lg
+  },
+  cardHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  syncText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase"
   },
   pass: {
     backgroundColor: colors.card,
@@ -169,19 +300,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: spacing.xl
   },
-  qrBox: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: spacing.md
-  },
-  orderCode: {
+  pickupName: {
     color: colors.ink,
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "900",
-    letterSpacing: 2,
-    marginTop: spacing.lg
+    textAlign: "center"
+  },
+  codeHelp: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "800",
+    marginTop: spacing.sm,
+    textAlign: "center"
   },
   passMeta: {
     borderTopColor: colors.border,

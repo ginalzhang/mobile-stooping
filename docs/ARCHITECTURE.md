@@ -104,8 +104,8 @@ It includes:
 
 - success state
 - pickup window and address
-- generated pickup code
-- QR code containing code, pickup label, and item count
+- customer name for pickup
+- item count and pickup details
 - item summary
 - reminder controls through `NotificationPanel`
 

@@ -1,0 +1,16 @@
+{
+  "name": "stooping-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env src/index.js",
+    "migrate": "psql \"$DATABASE_URL\" -f schema.sql"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "luxon": "^3.5.0",
+    "nanoid": "^5.0.7",
+    "node-cron": "^3.0.3",
+    "pg": "^8.12.0"
+  }
+}

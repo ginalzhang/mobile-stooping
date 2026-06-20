@@ -23,4 +23,9 @@ export type OrderConfirmation = {
   customer: CustomerInfo;
   items: CartItem[];
   confirmedAt: string;
+  reservationId?: string;
+  passCode?: string;
+  reservationStatus?: string;
+  confirmBy?: string;
+  pickupAt?: string;
 };

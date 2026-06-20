@@ -104,6 +104,7 @@ export async function cancelStoopingReminderNotifications(): Promise<void> {
 }
 
 export async function scheduleStoopingReminderNotifications(): Promise<ReminderScheduleResult> {
+  // Backup only. Authoritative reminders are server push jobs in server/.
   const permissionState = await requestNotificationPermission();
 
   if (permissionState !== "granted") {
@@ -180,6 +181,22 @@ export async function scheduleStoopingReminderNotifications(): Promise<ReminderS
       permissionState: "unavailable",
       message: NOTIFICATION_COPY.unavailableFallback
     };
+  }
+}
+
+export async function getStoopingPushToken(): Promise<string | null> {
+  const permissionState = await requestNotificationPermission();
+
+  if (permissionState !== "granted") {
+    return null;
+  }
+
+  try {
+    await ensureNotificationChannel();
+    const token = await Notifications.getExpoPushTokenAsync();
+    return token.data;
+  } catch {
+    return null;
   }
 }
 
