@@ -1,10 +1,9 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,11 +20,13 @@ import { ProductCard } from "../../components/ProductCard";
 import { Screen } from "../../components/Screen";
 import { StateView } from "../../components/StateView";
 import { StoopyMascot } from "../../components/StoopyMascot";
+import { ORDER_LIMIT } from "../../constants/pickup";
 import { useCart } from "../cart/CartContext";
 import type { ShopStackParamList } from "../../navigation/types";
 import { colors } from "../../theme/colors";
 import { spacing, typography } from "../../theme/theme";
 import type { Product } from "../../types/product";
+import { StrollExperience } from "./stroll";
 
 type Props = NativeStackScreenProps<ShopStackParamList, "ShopHome">;
 type BrowseMode = "Grid" | "Collections" | "Stroll";
@@ -35,9 +36,7 @@ const modes: BrowseMode[] = ["Grid", "Collections", "Stroll"];
 export function ShopScreen({ navigation }: Props) {
   const [mode, setMode] = useState<BrowseMode>("Grid");
   const [search, setSearch] = useState("");
-  const [strollQueue, setStrollQueue] = useState<string[]>([]);
-  const [strolledIds, setStrolledIds] = useState<string[]>([]);
-  const { addItem, items } = useCart();
+  const { addItem, items, totalQuantity } = useCart();
 
   const filters = useMemo(
     () => ({ inStockOnly: true, search, sort: "RECENTLY_ADDED" as const }),
@@ -63,36 +62,6 @@ export function ShopScreen({ navigation }: Props) {
     [products]
   );
   const collectionGroups = useMemo(() => groupProductsByCategory(products), [products]);
-  const strollProduct = useMemo(() => {
-    const queuedId = strollQueue[0];
-    return (
-      availableProducts.find((product) => product.id === queuedId) ??
-      availableProducts[0]
-    );
-  }, [availableProducts, strollQueue]);
-  const strolledAllItems =
-    mode === "Stroll" &&
-    availableProducts.length > 0 &&
-    strolledIds.length >= availableProducts.length;
-
-  useEffect(() => {
-    if (!availableProducts.length) {
-      setStrollQueue([]);
-      setStrolledIds([]);
-      return;
-    }
-
-    setStrollQueue((currentQueue) => {
-      const availableIds = new Set(availableProducts.map((product) => product.id));
-      const validQueue = currentQueue.filter((id) => availableIds.has(id));
-      if (validQueue.length) return validQueue;
-      return shuffle(availableProducts.map((product) => product.id));
-    });
-    setStrolledIds((ids) => {
-      const availableIds = new Set(availableProducts.map((product) => product.id));
-      return ids.filter((id) => availableIds.has(id));
-    });
-  }, [availableProducts]);
   const refreshControl = (
     <RefreshControl
       refreshing={productsQuery.isRefetching}
@@ -101,22 +70,69 @@ export function ShopScreen({ navigation }: Props) {
     />
   );
 
-  const openProduct = (product: Product) => {
+  const openProduct = useCallback((product: Product) => {
     navigation.navigate("ProductDetail", {
       handle: product.handle,
       productId: product.id
     });
-  };
+  }, [navigation]);
 
-  const isInOrder = (product: Product) =>
-    items.some((item) => item.product.variantId === product.variantId);
+  const isInOrder = useCallback(
+    (product: Product) =>
+      items.some((item) => item.product.variantId === product.variantId),
+    [items]
+  );
 
-  const addProduct = (product: Product) => {
+  const reserveProduct = useCallback((product: Product) => {
+    if (!product.variantId.trim()) {
+      Alert.alert("Could not add item", "This find is missing checkout details.");
+      return false;
+    }
+
+    if (!product.availableForSale || product.stockCount <= 0) {
+      Alert.alert("Already claimed", "This find is no longer available.");
+      return false;
+    }
+
+    if (totalQuantity >= ORDER_LIMIT) {
+      Alert.alert("Order is full", `Orders are limited to ${ORDER_LIMIT} items.`);
+      return false;
+    }
+
+    const quantityInCart = items
+      .filter((item) => item.product.variantId === product.variantId)
+      .reduce((sum, item) => sum + item.quantity, 0);
+
+    if (quantityInCart >= product.stockCount) {
+      Alert.alert(
+        "Already reserved",
+        "You already added the available stock for this item."
+      );
+      return false;
+    }
+
     const result = addItem(product);
     if (!result.ok) {
       Alert.alert("Could not add item", result.message ?? "Try another find.");
+      return false;
     }
-  };
+
+    return true;
+  }, [addItem, items, totalQuantity]);
+
+  const addProduct = useCallback((product: Product) => {
+    reserveProduct(product);
+  }, [reserveProduct]);
+
+  const loadMoreStrollProducts = useCallback(() => {
+    if (productsQuery.hasNextPage && !productsQuery.isFetchingNextPage) {
+      void productsQuery.fetchNextPage();
+    }
+  }, [
+    productsQuery.fetchNextPage,
+    productsQuery.hasNextPage,
+    productsQuery.isFetchingNextPage
+  ]);
 
   const header = (
     <View style={styles.header}>
@@ -199,44 +215,17 @@ export function ShopScreen({ navigation }: Props) {
 
   if (mode === "Stroll") {
     return (
-      <Screen>
+      <Screen scroll={false}>
         {header}
-        {strolledAllItems ? (
-          <StateView
-            title="You strolled the whole block"
-            message="Stoopy showed every available find in this view. New drops land before Sunday pickup."
-            actionLabel="Start over"
-            onAction={() => {
-              setStrolledIds([]);
-              setStrollQueue(shuffle(availableProducts.map((product) => product.id)));
-            }}
-            showMascot
-          />
-        ) : strollProduct ? (
-          <StrollCard
-            inOrder={isInOrder(strollProduct)}
-            onAdd={() => addProduct(strollProduct)}
-            onNext={() => {
-              setStrolledIds((ids) =>
-                ids.includes(strollProduct.id) ? ids : [...ids, strollProduct.id]
-              );
-              setStrollQueue((queue) => {
-                const remaining = queue.filter((id) => id !== strollProduct.id);
-                return remaining.length
-                  ? remaining
-                  : shuffle(
-                      availableProducts
-                        .filter((product) => product.id !== strollProduct.id)
-                        .map((product) => product.id)
-                    );
-              });
-            }}
-            onPress={() => openProduct(strollProduct)}
-            product={strollProduct}
-          />
-        ) : (
-          <NoResultsView search={search} />
-        )}
+        <StrollExperience
+          cartItems={items}
+          hasNextPage={productsQuery.hasNextPage}
+          onNeedMoreProducts={loadMoreStrollProducts}
+          onOpenProduct={openProduct}
+          onReserveProduct={reserveProduct}
+          products={products}
+          resetKey={search}
+        />
       </Screen>
     );
   }
@@ -435,97 +424,6 @@ function ModeSegment({
   );
 }
 
-function StrollCard({
-  inOrder,
-  onAdd,
-  onNext,
-  onPress,
-  product
-}: {
-  inOrder: boolean;
-  onAdd: () => void;
-  onNext: () => void;
-  onPress: () => void;
-  product: Product;
-}) {
-  const image = product.images[0];
-  const condition = product.condition || "Good used condition";
-
-  return (
-    <View style={styles.strollCard}>
-      <View style={styles.stoopyRow}>
-        <StoopyMascot caption="" size="small" />
-        <View style={styles.speechBubble}>
-          <Text style={styles.speechTitle}>Stoopy found you something.</Text>
-          <Text style={styles.speechText}>
-            One free pickup-only item at a time. Keep strolling for the next reuse find.
-          </Text>
-        </View>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${product.title}`}
-        onPress={onPress}
-        style={({ pressed }) => pressed && styles.pressed}
-      >
-        {image ? (
-          <Image source={{ uri: image }} style={styles.strollImage} resizeMode="cover" />
-        ) : (
-          <View style={[styles.strollImage, styles.imageFallback]}>
-            <Text style={typography.h2}>$0</Text>
-          </View>
-        )}
-      </Pressable>
-      <View style={styles.strollBody}>
-        <Pressable
-          accessibilityLabel={`Open ${product.title}`}
-          accessibilityRole="button"
-          onPress={onPress}
-        >
-          <Text style={typography.h2}>{product.title}</Text>
-        </Pressable>
-        <View style={styles.strollMetaRow}>
-          <View style={styles.pricePill}>
-            <Text style={styles.pricePillText}>$0</Text>
-          </View>
-          <View style={styles.categoryPill}>
-            <Text numberOfLines={1} style={styles.categoryPillText}>
-              {product.category}
-            </Text>
-          </View>
-          <View style={styles.stockPill}>
-            <Text style={styles.stockPillText}>
-              {product.stockCount === 1 ? "Last one" : `${product.stockCount} left`}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.conditionBox}>
-          <Text style={styles.conditionLabel}>Condition</Text>
-          <Text style={styles.conditionText}>{condition}</Text>
-        </View>
-        <View style={styles.pickupBox}>
-          <Text style={styles.pickupBoxText}>$0 · local pickup only · reuse first</Text>
-        </View>
-        <View style={styles.strollActions}>
-          <AppButton
-            label="Next find"
-            variant="secondary"
-            onPress={onNext}
-            style={styles.strollActionButton}
-          />
-          <AppButton
-            disabled={inOrder}
-            label={inOrder ? "In your order" : "Add to order"}
-            onPress={onAdd}
-            style={styles.strollActionButton}
-            variant={inOrder ? "accent" : "primary"}
-          />
-        </View>
-      </View>
-    </View>
-  );
-}
-
 function groupProductsByCategory(products: Product[]) {
   const groups = new Map<string, Product[]>();
   products.forEach((product) => {
@@ -538,15 +436,6 @@ function groupProductsByCategory(products: Product[]) {
   return Array.from(groups.entries())
     .map(([category, groupProducts]) => ({ category, products: groupProducts }))
     .sort((a, b) => b.products.length - a.products.length || a.category.localeCompare(b.category));
-}
-
-function shuffle<T>(items: T[]) {
-  const nextItems = [...items];
-  for (let index = nextItems.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [nextItems[index], nextItems[swapIndex]] = [nextItems[swapIndex], nextItems[index]];
-  }
-  return nextItems;
 }
 
 const styles = StyleSheet.create({
@@ -732,126 +621,5 @@ const styles = StyleSheet.create({
   },
   loadMore: {
     marginTop: spacing.sm
-  },
-  pressed: {
-    opacity: 0.8
-  },
-  strollCard: {
-    gap: spacing.md
-  },
-  strollImage: {
-    aspectRatio: 1,
-    backgroundColor: colors.paper2,
-    borderRadius: 8,
-    width: "100%"
-  },
-  imageFallback: {
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  strollBody: {
-    gap: spacing.md
-  },
-  stoopyRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.md
-  },
-  speechBubble: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
-    flex: 1,
-    padding: spacing.md
-  },
-  speechTitle: {
-    color: colors.forest,
-    fontSize: 15,
-    fontWeight: "900"
-  },
-  speechText: {
-    color: colors.muted,
-    fontSize: 13,
-    lineHeight: 18
-  },
-  strollMetaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm
-  },
-  pricePill: {
-    backgroundColor: colors.forest,
-    borderRadius: 999,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs
-  },
-  pricePillText: {
-    color: colors.card,
-    fontSize: 16,
-    fontWeight: "900"
-  },
-  categoryPill: {
-    backgroundColor: colors.paper2,
-    borderRadius: 999,
-    maxWidth: "55%",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs
-  },
-  categoryPillText: {
-    color: colors.forest,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  stockPill: {
-    backgroundColor: colors.lime,
-    borderRadius: 999,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs
-  },
-  stockPillText: {
-    color: colors.limeInk,
-    fontSize: 13,
-    fontWeight: "900"
-  },
-  conditionBox: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: spacing.xs,
-    padding: spacing.md
-  },
-  conditionLabel: {
-    color: colors.forest,
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase"
-  },
-  conditionText: {
-    color: colors.ink2,
-    fontSize: 15,
-    fontWeight: "800",
-    lineHeight: 21
-  },
-  pickupBox: {
-    backgroundColor: colors.paper2,
-    borderRadius: 8,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm
-  },
-  pickupBoxText: {
-    color: colors.forest,
-    fontSize: 13,
-    fontWeight: "900",
-    lineHeight: 18,
-    textAlign: "center"
-  },
-  strollActions: {
-    flexDirection: "row",
-    gap: spacing.sm
-  },
-  strollActionButton: {
-    flex: 1
   }
 });

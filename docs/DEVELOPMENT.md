@@ -61,17 +61,23 @@ Recommended manual smoke test:
 2. Confirm Shop loads live products.
 3. Search inventory.
 4. Switch between Grid, Collections, and Stroll.
-5. Search for a term with no matches and confirm the empty search copy is specific.
-6. Open a product detail screen.
-7. Swipe through product photos and confirm the image counter updates when multiple photos are present.
-8. Confirm `$0`, pickup-only, condition, status, and reuse trust copy are visible.
-9. Add one item to the order.
-10. Confirm the Order tab badge updates.
-11. Enter valid name, email, and phone.
-12. Start checkout and confirm Shopify checkout opens.
-13. Return to the app and confirm the pickup pass appears.
-14. Enable and cancel pickup reminders.
-15. Restart the app and confirm persisted customer/confirmation behavior is acceptable.
+5. In Stroll, drag under the threshold and confirm the card snaps back.
+6. Swipe left or press `Stroll on` and confirm the card advances, the STROLL stamp appears, Stoopy speech changes, and progress updates.
+7. Swipe right or press `Reserve` and confirm the RESERVE stamp, confetti, cheer speech, and Order tab badge.
+8. Fill the order to the 10-item limit and confirm a failed Stroll reserve snaps back instead of advancing.
+9. Stroll through the loaded queue and confirm next-page loading or the whole-block/start-over state appears.
+10. Tap the Stroll card and confirm product detail opens.
+11. Search for a term with no matches and confirm the empty search copy is specific.
+12. Open a product detail screen.
+13. Swipe through product photos and confirm the image counter updates when multiple photos are present.
+14. Confirm `$0`, pickup-only, condition, status, and reuse trust copy are visible.
+15. Add one item to the order.
+16. Confirm the Order tab badge updates.
+17. Enter valid name, email, and phone.
+18. Start checkout and confirm Shopify checkout opens.
+19. Return to the app and confirm the pickup pass appears.
+20. Enable and cancel pickup reminders.
+21. Restart the app and confirm persisted customer/confirmation behavior is acceptable.
 
 ## Environment Variables
 
@@ -105,6 +111,7 @@ For Conductor workspaces:
 - Run scripts run from the workspace directory.
 - Use Files to copy or `.worktreeinclude` for local `.env` files if every workspace needs the same Shopify credentials.
 - Avoid committing `.env`; the branch `.gitignore` excludes `.env` and `.env.*` while allowing `.env.example`.
+- The Stroll swipe port intentionally uses React Native core `Animated` and `PanResponder`, with no Reanimated or gesture-handler dependency.
 - Expo usually supports configurable ports, but the app scripts do not currently wire `CONDUCTOR_PORT` into `expo start`.
 
 If adding shared Conductor configuration after the app source is on the target branch, a conservative starting point is:
@@ -128,6 +135,7 @@ When changing Shopify product behavior, review:
 - `src/api/shopify.ts`
 - `src/types/product.ts`
 - `src/features/shop/ShopScreen.tsx`
+- `src/features/shop/stroll/`
 - `src/features/product/ProductDetailScreen.tsx`
 - `src/features/cart/CartScreen.tsx`
 

@@ -39,7 +39,7 @@ It supports three browse modes:
 
 - `Grid`: two-column list of products.
 - `Collections`: groups the currently loaded products by resolved category.
-- `Stroll`: shows one randomly queued available item at a time.
+- `Stroll`: shows a native stacked swipe deck of available products; swipe left to stroll on, swipe right to reserve, or use the accessible button fallbacks.
 
 Shop uses `useInfiniteQuery` with `fetchProducts`. Product pages are flattened for rendering, and infinite loading uses Shopify cursors returned by the API client.
 
@@ -52,6 +52,8 @@ Important behavior:
 - Cached inventory is surfaced with an Offline pill/banner when any page came from cache.
 - Product cards show a FREE badge, stock label, condition, `$0`, and pickup-only copy. There is no local saved/favorite state.
 - Empty search and no-inventory states use different copy so judges can distinguish a filtered miss from a claimed-out drop.
+
+`src/features/shop/stroll/` owns the swipe experience. It uses React Native core `Animated`, `PanResponder`, `Pressable`, and existing app components, so the handoff is implemented without adding Reanimated or gesture-handler. `useStrollDeck` filters out unavailable products, invalid checkout variants, and variants already in the order; keeps seen IDs per search; asks the product query for the next Shopify page near queue exhaustion; and only advances on reserve after the existing cart `addItem` path succeeds.
 
 ### Product Detail
 

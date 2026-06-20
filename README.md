@@ -4,7 +4,7 @@ Expo React Native + TypeScript app for browsing Stooping Club Berkeley inventory
 
 ## What The App Does
 
-- Shows live Shopify inventory in three browse modes: Grid, Collections, and randomized Stroll.
+- Shows live Shopify inventory in three browse modes: Grid, Collections, and swipeable Stroll.
 - Falls back to cached inventory when Shopify is unavailable, including offline Stroll through saved items.
 - Labels product cards as free pickup-only finds instead of using decorative favorite controls.
 - Lets customers open product details, page through photos, see stock, condition, estimated retail value when available, pickup details, reuse trust notes, and item notes.
@@ -28,6 +28,7 @@ Expo React Native + TypeScript app for browsing Stooping Club Berkeley inventory
 - AsyncStorage for local cart, customer, product-cache, and confirmation state
 - Expo Notifications for local pickup reminders
 - Shopify Storefront GraphQL API for products and cart creation
+- Stroll swipe uses React Native core `Animated` and `PanResponder`; no new gesture dependency is required.
 
 ## Project Layout
 
@@ -43,6 +44,7 @@ src/features/content/           About tab content and screen
 src/features/notifications/     Local reminder permission and scheduling UI
 src/features/product/           Product detail screen
 src/features/shop/              Grid, Collections, and Stroll browse screen
+src/features/shop/stroll/       Native Stroll swipe deck, mascot band, and celebration
 src/navigation/                 Root tab and stack navigation
 src/theme/                      Colors, spacing, typography, radii
 src/types/                      Product and order domain types
@@ -88,8 +90,8 @@ npm run typecheck  # tsc --noEmit
 1. Open the app and land on Shop.
 2. Show Grid mode with live inventory.
 3. Switch to Collections and search inventory.
-4. Switch to Stroll and show randomized one-item browsing.
-5. Search for a term with no matches to show the empty search state.
+4. Search for a term with no matches to show the empty search state, then clear search.
+5. Switch to Stroll, swipe left to keep strolling, swipe right to reserve, and show the button fallbacks.
 6. Open a product, page through photos, and review $0 price, condition, status, pickup-only policy, and reuse trust notes.
 7. Add up to 10 items to Order.
 8. Enter name/email/phone and confirm.
@@ -119,4 +121,4 @@ npm run typecheck  # tsc --noEmit
 
 ## Submission Description
 
-Stooping Club Mobile is a free-shopping mobile app for Stooping Club Berkeley. It pulls live Shopify inventory, lets users browse by grid, collection, or a playful randomized Stroll mode, supports cached offline browsing, shows photo paging, standardized item status, condition, pickup-only policy, and reuse trust details, builds a 10-item pickup order, opens Shopify checkout, and schedules order-specific Friday confirmation and Sunday pickup reminders. The app also includes mission, impact, trust, story, team, branches, and customer content so judges can see both the core commerce loop and the broader reuse movement.
+Stooping Club Mobile is a free-shopping mobile app for Stooping Club Berkeley. It pulls live Shopify inventory, lets users browse by grid, collection, or a playful swipeable Stroll mode, supports cached offline browsing, shows photo paging, standardized item status, condition, pickup-only policy, and reuse trust details, builds a 10-item pickup order, opens Shopify checkout, and schedules order-specific Friday confirmation and Sunday pickup reminders. The app also includes mission, impact, trust, story, team, branches, and customer content so judges can see both the core commerce loop and the broader reuse movement.
