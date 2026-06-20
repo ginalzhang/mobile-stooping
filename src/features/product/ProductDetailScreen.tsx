@@ -1,12 +1,14 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { fetchProduct } from "../../api/shopify";
 import { AppButton } from "../../components/AppButton";
+import { OrderFullButton, OrderFullToast } from "../../components/OrderFullNotice";
 import { Screen } from "../../components/Screen";
 import { StateView } from "../../components/StateView";
-import { DEFAULT_PICKUP } from "../../constants/pickup";
+import { DEFAULT_PICKUP, ORDER_LIMIT } from "../../constants/pickup";
 import { useCart } from "../cart/CartContext";
 import type { ShopStackParamList } from "../../navigation/types";
 import { colors } from "../../theme/colors";
@@ -15,12 +17,20 @@ import { spacing, typography } from "../../theme/theme";
 type Props = NativeStackScreenProps<ShopStackParamList, "ProductDetail">;
 
 export function ProductDetailScreen({ route, navigation }: Props) {
-  const { addItem } = useCart();
+  const { addItem, totalQuantity } = useCart();
+  const [orderFullToastVisible, setOrderFullToastVisible] = useState(false);
+  const orderFullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { productId, handle } = route.params;
   const productQuery = useQuery({
     queryKey: ["product", productId, handle],
     queryFn: () => fetchProduct({ id: productId, handle })
   });
+
+  useEffect(() => {
+    return () => {
+      if (orderFullTimerRef.current) clearTimeout(orderFullTimerRef.current);
+    };
+  }, []);
 
   if (productQuery.isLoading) {
     return (
@@ -45,6 +55,7 @@ export function ProductDetailScreen({ route, navigation }: Props) {
 
   const product = productQuery.data;
   const isAvailable = product.availableForSale && product.stockCount > 0;
+  const orderFull = totalQuantity >= ORDER_LIMIT;
   const condition = product.condition || "Good used condition";
   const category = product.category || "Uncategorized";
   const retailValue =
@@ -55,6 +66,10 @@ export function ProductDetailScreen({ route, navigation }: Props) {
   const onAdd = () => {
     const result = addItem(product);
     if (!result.ok) {
+      if (result.reason === "order_limit") {
+        showOrderFullToast();
+        return;
+      }
       Alert.alert("Could not add item", result.message);
       return;
     }
@@ -62,6 +77,21 @@ export function ProductDetailScreen({ route, navigation }: Props) {
       { text: "Keep browsing" },
       { text: "View order", onPress: () => navigation.getParent()?.navigate("Order") }
     ]);
+  };
+
+  const showOrderFullToast = () => {
+    if (orderFullTimerRef.current) clearTimeout(orderFullTimerRef.current);
+    setOrderFullToastVisible(true);
+    orderFullTimerRef.current = setTimeout(() => {
+      setOrderFullToastVisible(false);
+      orderFullTimerRef.current = null;
+    }, 2500);
+  };
+
+  const openOrderTab = () => {
+    if (orderFullTimerRef.current) clearTimeout(orderFullTimerRef.current);
+    setOrderFullToastVisible(false);
+    navigation.getParent()?.navigate("Order", { screen: "OrderHome" });
   };
 
   return (
@@ -124,7 +154,11 @@ export function ProductDetailScreen({ route, navigation }: Props) {
       </View>
 
       {isAvailable ? (
-        <AppButton label="Add to Order" onPress={onAdd} style={styles.bottomAction} />
+        orderFull ? (
+          <OrderFullButton onPress={showOrderFullToast} style={styles.bottomAction} />
+        ) : (
+          <AppButton label="Add to Order" onPress={onAdd} style={styles.bottomAction} />
+        )
       ) : (
         <View style={styles.claimedFooter}>
           <Text style={styles.claimedFooterText}>
@@ -132,6 +166,10 @@ export function ProductDetailScreen({ route, navigation }: Props) {
           </Text>
         </View>
       )}
+      <OrderFullToast
+        onViewOrder={openOrderTab}
+        visible={orderFullToastVisible}
+      />
     </Screen>
   );
 }

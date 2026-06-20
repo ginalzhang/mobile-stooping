@@ -22,7 +22,7 @@ type CartContextValue = {
   customer: CustomerInfo;
   confirmation: OrderConfirmation | null;
   totalQuantity: number;
-  addItem: (product: Product) => { ok: boolean; message?: string };
+  addItem: (product: Product) => { ok: boolean; message?: string; reason?: "order_limit" };
   removeItem: (variantId: string) => void;
   clearCart: () => void;
   setCustomer: (customer: CustomerInfo) => void;
@@ -84,7 +84,11 @@ export function CartProvider({ children }: PropsWithChildren) {
         return { ok: false, message: "This item is out of stock." };
       }
       if (totalQuantity >= ORDER_LIMIT) {
-        return { ok: false, message: `Orders are limited to ${ORDER_LIMIT} items.` };
+        return {
+          ok: false,
+          message: `Orders are limited to ${ORDER_LIMIT} items.`,
+          reason: "order_limit" as const
+        };
       }
 
       const existing = items.find((item) => item.product.variantId === product.variantId);

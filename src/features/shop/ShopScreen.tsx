@@ -1,7 +1,9 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   Alert,
   FlatList,
   Image,
@@ -11,33 +13,79 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View
 } from "react-native";
+import Svg, { Circle, Path } from "react-native-svg";
 
 import { fetchProducts } from "../../api/shopify";
 import { AppButton } from "../../components/AppButton";
 import { BrandLogo } from "../../components/BrandLogo";
+import { OrderFullButton, OrderFullToast } from "../../components/OrderFullNotice";
 import { ProductCard } from "../../components/ProductCard";
 import { Screen } from "../../components/Screen";
 import { StateView } from "../../components/StateView";
 import { StoopyMascot } from "../../components/StoopyMascot";
+import { ORDER_LIMIT } from "../../constants/pickup";
 import { useCart } from "../cart/CartContext";
 import type { ShopStackParamList } from "../../navigation/types";
 import { colors } from "../../theme/colors";
 import { spacing, typography } from "../../theme/theme";
 import type { Product } from "../../types/product";
+import {
+  DailyCompleteOverlay,
+  StrollGoalHeader,
+  StrollScene,
+  type SpeechTone,
+  type StrollMood
+} from "./components/StrollExperience";
 
 type Props = NativeStackScreenProps<ShopStackParamList, "ShopHome">;
 type BrowseMode = "Grid" | "Collections" | "Stroll";
 
 const modes: BrowseMode[] = ["Grid", "Collections", "Stroll"];
+const DAILY_STROLL_TARGET = 10;
+const STROLL_STREAK_KEY = "stooping.stroll.streak.v1";
+const STROLL_LINES = [
+  "Next one's down the block.",
+  "Ooh, keep strolling.",
+  "Found another for you.",
+  "One more curb to check.",
+  "Stooped this one just now."
+];
+const RESERVE_LINES = [
+  "It's yours. Nice grab.",
+  "Reserved - see you Sunday.",
+  "Good eye. Saved for you.",
+  "That one's off the curb."
+];
+type StrollStreakState = {
+  streakCount: number;
+  lastCompletedDate: string | null;
+};
 
 export function ShopScreen({ navigation }: Props) {
+  const { height: windowHeight } = useWindowDimensions();
   const [mode, setMode] = useState<BrowseMode>("Grid");
   const [search, setSearch] = useState("");
   const [strollQueue, setStrollQueue] = useState<string[]>([]);
   const [strolledIds, setStrolledIds] = useState<string[]>([]);
-  const { addItem, items } = useCart();
+  const [dailyStrollCount, setDailyStrollCount] = useState(0);
+  const [dailyDone, setDailyDone] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [lastCompletedDate, setLastCompletedDate] = useState<string | null>(null);
+  const [stoopyMood, setStoopyMood] = useState<StrollMood>("walk");
+  const [speech, setSpeech] = useState<{
+    text: string;
+    tone: SpeechTone;
+  }>({ text: "Stoopy found you something.", tone: "neutral" });
+  const [celebrationKey, setCelebrationKey] = useState(0);
+  const [orderFullToastVisible, setOrderFullToastVisible] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const moodTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dailyGoalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const orderFullTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { addItem, items, totalQuantity } = useCart();
 
   const filters = useMemo(
     () => ({ inStockOnly: true, search, sort: "RECENTLY_ADDED" as const }),
@@ -73,11 +121,20 @@ export function ShopScreen({ navigation }: Props) {
     mode === "Stroll" &&
     availableProducts.length > 0 &&
     strolledIds.length >= availableProducts.length;
-
+  const dailyGoal = Math.min(DAILY_STROLL_TARGET, availableProducts.length);
+  const displayedStreak = getDisplayStreak({ streakCount: streak, lastCompletedDate });
+  const compactStroll = windowHeight <= 720;
+  const strollImageMaxHeight = Math.max(
+    104,
+    Math.min(compactStroll ? 136 : 220, windowHeight * (compactStroll ? 0.18 : 0.26))
+  );
+  const orderFull = totalQuantity >= ORDER_LIMIT;
   useEffect(() => {
     if (!availableProducts.length) {
       setStrollQueue([]);
       setStrolledIds([]);
+      setDailyStrollCount(0);
+      setDailyDone(false);
       return;
     }
 
@@ -92,6 +149,49 @@ export function ShopScreen({ navigation }: Props) {
       return ids.filter((id) => availableIds.has(id));
     });
   }, [availableProducts]);
+
+  useEffect(() => {
+    if (dailyGoal > 0 && dailyStrollCount > dailyGoal) {
+      setDailyStrollCount(dailyGoal);
+    }
+  }, [dailyGoal, dailyStrollCount]);
+
+  useEffect(() => {
+    let mounted = true;
+    void loadStrollStreak().then((storedStreak) => {
+      if (!mounted) return;
+      setLastCompletedDate(storedStreak.lastCompletedDate);
+      setStreak(getDisplayStreak(storedStreak));
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReducedMotion(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setReducedMotion
+    );
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (moodTimerRef.current) clearTimeout(moodTimerRef.current);
+      if (dailyGoalTimerRef.current) clearTimeout(dailyGoalTimerRef.current);
+      if (orderFullTimerRef.current) clearTimeout(orderFullTimerRef.current);
+    };
+  }, []);
   const refreshControl = (
     <RefreshControl
       refreshing={productsQuery.isRefetching}
@@ -113,15 +213,135 @@ export function ShopScreen({ navigation }: Props) {
   const addProduct = (product: Product) => {
     const result = addItem(product);
     if (!result.ok) {
+      if (result.reason === "order_limit") {
+        showOrderFullToast();
+        return false;
+      }
       Alert.alert("Could not add item", result.message ?? "Try another find.");
+    }
+    return result.ok;
+  };
+
+  const showOrderFullToast = () => {
+    if (orderFullTimerRef.current) clearTimeout(orderFullTimerRef.current);
+    setOrderFullToastVisible(true);
+    orderFullTimerRef.current = setTimeout(() => {
+      setOrderFullToastVisible(false);
+      orderFullTimerRef.current = null;
+    }, 2500);
+  };
+
+  const openOrderTab = () => {
+    if (orderFullTimerRef.current) clearTimeout(orderFullTimerRef.current);
+    setOrderFullToastVisible(false);
+    navigation.getParent()?.navigate("Order", { screen: "OrderHome" });
+  };
+
+  const resetMoodLater = (delay = 900) => {
+    if (moodTimerRef.current) clearTimeout(moodTimerRef.current);
+    moodTimerRef.current = setTimeout(() => {
+      setStoopyMood("walk");
+      moodTimerRef.current = null;
+    }, delay);
+  };
+
+  const updateDailyStreak = async () => {
+    const storedStreak = await loadStrollStreak();
+    const today = getLocalDateKey();
+    const yesterday = getLocalDateKey(new Date(Date.now() - 864e5));
+    let nextStreak = storedStreak.streakCount;
+
+    if (storedStreak.lastCompletedDate === today) {
+      nextStreak = storedStreak.streakCount;
+    } else if (storedStreak.lastCompletedDate === yesterday) {
+      nextStreak = storedStreak.streakCount + 1;
+    } else {
+      nextStreak = 1;
+    }
+
+    const nextStreakState = {
+      streakCount: nextStreak,
+      lastCompletedDate: today
+    };
+    setStreak(nextStreak);
+    setLastCompletedDate(today);
+    try {
+      await AsyncStorage.setItem(STROLL_STREAK_KEY, JSON.stringify(nextStreakState));
+    } catch {
+      // Keep the in-memory streak responsive even if local storage is temporarily unavailable.
     }
   };
 
+  const celebrateDailyGoal = async () => {
+    await updateDailyStreak();
+    setStoopyMood("cheer");
+    setCelebrationKey(Date.now());
+    setDailyDone(true);
+  };
+
+  const recordDailyStroll = () => {
+    if (dailyGoal <= 0) return;
+    setDailyStrollCount((currentCount) => {
+      const nextCount = Math.min(currentCount + 1, dailyGoal);
+      if (nextCount >= dailyGoal && !dailyDone) {
+        if (dailyGoalTimerRef.current) clearTimeout(dailyGoalTimerRef.current);
+        dailyGoalTimerRef.current = setTimeout(() => {
+          void celebrateDailyGoal();
+          dailyGoalTimerRef.current = null;
+        }, reducedMotion ? 0 : 220);
+      }
+      return nextCount;
+    });
+  };
+
+  const handleStrollOn = (product: Product) => {
+    recordDailyStroll();
+    setStrolledIds((ids) =>
+      ids.includes(product.id) ? ids : [...ids, product.id]
+    );
+    setStrollQueue((queue) => {
+      const remaining = queue.filter((id) => id !== product.id);
+      return remaining.length
+        ? remaining
+        : shuffle(
+            availableProducts
+              .filter((availableProduct) => availableProduct.id !== product.id)
+              .map((availableProduct) => availableProduct.id)
+          );
+    });
+    setStoopyMood("wave");
+    setSpeech({ text: pickRandom(STROLL_LINES), tone: "skip" });
+    resetMoodLater(700);
+  };
+
+  const handleStrollAdd = (product: Product) => {
+    const added = addProduct(product);
+    if (!added) return;
+    setStoopyMood("cheer");
+    setSpeech({ text: pickRandom(RESERVE_LINES), tone: "cheer" });
+    setCelebrationKey(Date.now());
+    resetMoodLater(1100);
+  };
+
+  const handleOrderFullPress = () => {
+    setStoopyMood("wave");
+    setSpeech({ text: "Your bag's full — drop one to grab this.", tone: "skip" });
+    showOrderFullToast();
+    resetMoodLater(1200);
+  };
+
+  const continueDailyStroll = () => {
+    setDailyDone(false);
+    setDailyStrollCount(0);
+    setStoopyMood("walk");
+    setSpeech({ text: "Fresh block, fresh finds.", tone: "neutral" });
+  };
+
   const header = (
-    <View style={styles.header}>
+    <View style={[styles.header, mode === "Stroll" && styles.strollHeader]}>
       {usingCachedInventory ? <OfflineInventoryBanner compact={mode === "Stroll"} /> : null}
       <View style={styles.brandRow}>
-        <BrandLogo size="medium" />
+        <BrandLogo size={mode === "Stroll" && compactStroll ? "small" : "medium"} />
         {usingCachedInventory ? (
           <View style={styles.offlinePill}>
             <Text style={styles.offlinePillText}>Offline</Text>
@@ -190,44 +410,72 @@ export function ShopScreen({ navigation }: Props) {
 
   if (mode === "Stroll") {
     return (
-      <Screen>
+      <Screen scroll={false}>
         {header}
-        {strolledAllItems ? (
-          <StateView
-            title="You strolled the whole block"
-            message="Stoopy showed every available find in this view. New drops land before Sunday pickup."
-            actionLabel="Start over"
-            onAction={() => {
-              setStrolledIds([]);
-              setStrollQueue(shuffle(availableProducts.map((product) => product.id)));
-            }}
-            showMascot
-          />
-        ) : strollProduct ? (
-          <StrollCard
-            inOrder={isInOrder(strollProduct)}
-            onAdd={() => addProduct(strollProduct)}
-            onNext={() => {
-              setStrolledIds((ids) =>
-                ids.includes(strollProduct.id) ? ids : [...ids, strollProduct.id]
-              );
-              setStrollQueue((queue) => {
-                const remaining = queue.filter((id) => id !== strollProduct.id);
-                return remaining.length
-                  ? remaining
-                  : shuffle(
-                      availableProducts
-                        .filter((product) => product.id !== strollProduct.id)
-                        .map((product) => product.id)
-                    );
-              });
-            }}
-            onPress={() => openProduct(strollProduct)}
-            product={strollProduct}
-          />
-        ) : (
-          <NoResultsView />
-        )}
+        <View style={[styles.strollExperience, compactStroll && styles.strollExperienceCompact]}>
+          {dailyGoal > 0 ? (
+              <StrollGoalHeader
+                goal={dailyGoal}
+                streak={displayedStreak}
+                strolled={dailyStrollCount}
+              />
+          ) : null}
+          {strolledAllItems ? (
+            <View style={styles.strollStateSlot}>
+              <StateView
+                title="You strolled the whole block"
+                message="Stoopy showed every available find in this view. New drops land before Sunday pickup."
+                actionLabel="Start over"
+                onAction={() => {
+                  setStrolledIds([]);
+                  setStrollQueue(shuffle(availableProducts.map((product) => product.id)));
+                }}
+                showMascot
+              />
+            </View>
+          ) : strollProduct ? (
+            <>
+              <StrollCard
+                compact={compactStroll}
+                imageMaxHeight={strollImageMaxHeight}
+                onPress={() => openProduct(strollProduct)}
+                product={strollProduct}
+              />
+              <StrollScene
+                bubbleText={speech.text}
+                bubbleTone={speech.tone}
+                celebrationKey={celebrationKey}
+                mood={stoopyMood}
+                reducedMotion={reducedMotion}
+                resetKey={strollProduct.id}
+                compact={compactStroll}
+              />
+              <StrollActionDock
+                inOrder={isInOrder(strollProduct)}
+                onAdd={() => handleStrollAdd(strollProduct)}
+                onNext={() => handleStrollOn(strollProduct)}
+                onOrderFullPress={handleOrderFullPress}
+                orderFull={orderFull}
+              />
+            </>
+          ) : (
+            <View style={styles.strollStateSlot}>
+              <NoResultsView />
+            </View>
+          )}
+          {dailyDone && dailyGoal > 0 ? (
+            <DailyCompleteOverlay
+              goal={dailyGoal}
+              onContinue={continueDailyStroll}
+              reducedMotion={reducedMotion}
+              streak={displayedStreak}
+            />
+          ) : null}
+        </View>
+        <OrderFullToast
+          onViewOrder={openOrderTab}
+          visible={orderFullToastVisible}
+        />
       </Screen>
     );
   }
@@ -247,7 +495,9 @@ export function ShopScreen({ navigation }: Props) {
                 inOrder={isInOrder}
                 key={group.category}
                 onAdd={addProduct}
+                onOrderFullPress={showOrderFullToast}
                 onPress={openProduct}
+                orderFull={orderFull}
                 products={group.products}
                 title={group.category}
               />
@@ -265,6 +515,10 @@ export function ShopScreen({ navigation }: Props) {
             />
           ) : null}
         </ScrollView>
+        <OrderFullToast
+          onViewOrder={openOrderTab}
+          visible={orderFullToastVisible}
+        />
       </Screen>
     );
   }
@@ -282,7 +536,9 @@ export function ShopScreen({ navigation }: Props) {
           <ProductCard
             inOrder={isInOrder(item)}
             onAdd={() => addProduct(item)}
+            onOrderFullPress={showOrderFullToast}
             onPress={() => openProduct(item)}
+            orderFull={orderFull}
             product={item}
           />
         )}
@@ -297,6 +553,10 @@ export function ShopScreen({ navigation }: Props) {
         }}
         onEndReachedThreshold={0.45}
       />
+      <OrderFullToast
+        onViewOrder={openOrderTab}
+        visible={orderFullToastVisible}
+      />
     </Screen>
   );
 }
@@ -304,13 +564,17 @@ export function ShopScreen({ navigation }: Props) {
 function CollectionShelf({
   inOrder,
   onAdd,
+  onOrderFullPress,
   onPress,
+  orderFull,
   products,
   title
 }: {
   inOrder: (product: Product) => boolean;
   onAdd: (product: Product) => void;
+  onOrderFullPress: () => void;
   onPress: (product: Product) => void;
+  orderFull: boolean;
   products: Product[];
   title: string;
 }) {
@@ -326,7 +590,9 @@ function CollectionShelf({
             <ProductCard
               inOrder={inOrder(product)}
               onAdd={() => onAdd(product)}
+              onOrderFullPress={onOrderFullPress}
               onPress={() => onPress(product)}
+              orderFull={orderFull}
               product={product}
             />
           </View>
@@ -398,49 +664,43 @@ function ModeSegment({
 }
 
 function StrollCard({
-  inOrder,
-  onAdd,
-  onNext,
+  compact,
+  imageMaxHeight,
   onPress,
   product
 }: {
-  inOrder: boolean;
-  onAdd: () => void;
-  onNext: () => void;
+  compact: boolean;
+  imageMaxHeight: number;
   onPress: () => void;
   product: Product;
 }) {
   const image = product.images[0];
   const condition = product.condition || "Good used condition";
+  const originLine = condition || `Rescued from ${product.category || "the curb"}`;
 
   return (
-    <View style={styles.strollCard}>
-      <View style={styles.stoopyRow}>
-        <StoopyMascot caption="" size="small" />
-        <View style={styles.speechBubble}>
-          <Text style={styles.speechTitle}>Stoopy found you something.</Text>
-          <Text style={styles.speechText}>
-            One second-life item at a time. Keep strolling for the next find.
-          </Text>
-        </View>
-      </View>
+    <View style={[styles.strollCard, compact && styles.strollCardCompact]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Open ${product.title}`}
         onPress={onPress}
-        style={({ pressed }) => pressed && styles.pressed}
+        style={({ pressed }) => [styles.strollImageButton, pressed && styles.pressed]}
       >
-        {image ? (
-          <Image source={{ uri: image }} style={styles.strollImage} resizeMode="cover" />
-        ) : (
-          <View style={[styles.strollImage, styles.imageFallback]}>
-            <Text style={typography.h2}>$0</Text>
-          </View>
-        )}
+        <View style={[styles.strollImageFrame, { height: imageMaxHeight, maxHeight: imageMaxHeight }]}>
+          {image ? (
+            <Image source={{ uri: image }} style={styles.strollImage} resizeMode="cover" />
+          ) : (
+            <View style={[styles.strollImage, styles.imageFallback]}>
+              <Text style={typography.h2}>$0</Text>
+            </View>
+          )}
+        </View>
       </Pressable>
       <View style={styles.strollBody}>
         <Pressable onPress={onPress}>
-          <Text style={typography.h2}>{product.title}</Text>
+          <Text numberOfLines={2} style={[styles.strollTitle, compact && styles.strollTitleCompact]}>
+            {product.title}
+          </Text>
         </Pressable>
         <View style={styles.strollMetaRow}>
           <View style={styles.pricePill}>
@@ -457,26 +717,65 @@ function StrollCard({
             </Text>
           </View>
         </View>
-        <View style={styles.conditionBox}>
-          <Text style={styles.conditionLabel}>Condition</Text>
-          <Text style={styles.conditionText}>{condition}</Text>
-        </View>
-        <View style={styles.strollActions}>
-          <AppButton
-            label="Next find"
-            variant="secondary"
-            onPress={onNext}
-            style={styles.strollActionButton}
-          />
-          <AppButton
-            disabled={inOrder}
-            label={inOrder ? "In your order" : "Add to order"}
-            onPress={onAdd}
-            style={styles.strollActionButton}
-            variant={inOrder ? "accent" : "primary"}
-          />
+        <View style={styles.originRow}>
+          <PinIcon />
+          <Text numberOfLines={1} style={styles.originText}>
+            {originLine}
+          </Text>
         </View>
       </View>
+    </View>
+  );
+}
+
+function PinIcon() {
+  return (
+    <Svg height={15} viewBox="0 0 24 24" width={15}>
+      <Path
+        d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"
+        fill="none"
+        stroke={colors.forest}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2.2}
+      />
+      <Circle cx={12} cy={9} fill="none" r={2.2} stroke={colors.forest} strokeWidth={2.2} />
+    </Svg>
+  );
+}
+
+function StrollActionDock({
+  inOrder,
+  onAdd,
+  onNext,
+  onOrderFullPress,
+  orderFull
+}: {
+  inOrder: boolean;
+  onAdd: () => void;
+  onNext: () => void;
+  onOrderFullPress: () => void;
+  orderFull: boolean;
+}) {
+  return (
+    <View style={styles.strollActions}>
+      <AppButton
+        label="Stroll on"
+        variant="secondary"
+        onPress={onNext}
+        style={styles.strollActionButton}
+      />
+      {orderFull && !inOrder ? (
+        <OrderFullButton onPress={onOrderFullPress} style={styles.strollActionButton} />
+      ) : (
+        <AppButton
+          disabled={inOrder}
+          label={inOrder ? "In your order" : "Reserve"}
+          onPress={onAdd}
+          style={styles.strollActionButton}
+          variant={inOrder ? "accent" : "primary"}
+        />
+      )}
     </View>
   );
 }
@@ -504,6 +803,57 @@ function shuffle<T>(items: T[]) {
   return nextItems;
 }
 
+function pickRandom(items: string[]) {
+  return items[Math.floor(Math.random() * items.length)] ?? items[0] ?? "";
+}
+
+function getLocalDateKey(date = new Date()) {
+  return date.toLocaleDateString("en-CA");
+}
+
+function emptyStrollStreak(): StrollStreakState {
+  return { streakCount: 0, lastCompletedDate: null };
+}
+
+function isStrollStreakState(value: unknown): value is StrollStreakState {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<StrollStreakState>;
+  return (
+    typeof candidate.streakCount === "number" &&
+    Number.isFinite(candidate.streakCount) &&
+    (candidate.lastCompletedDate === null ||
+      typeof candidate.lastCompletedDate === "string")
+  );
+}
+
+async function loadStrollStreak(): Promise<StrollStreakState> {
+  try {
+    const storedJson = await AsyncStorage.getItem(STROLL_STREAK_KEY);
+    if (!storedJson) return emptyStrollStreak();
+    const storedValue = JSON.parse(storedJson) as unknown;
+    if (!isStrollStreakState(storedValue)) return emptyStrollStreak();
+    return {
+      streakCount: Math.max(0, Math.floor(storedValue.streakCount)),
+      lastCompletedDate: storedValue.lastCompletedDate
+    };
+  } catch {
+    return emptyStrollStreak();
+  }
+}
+
+function getDisplayStreak(streakState: StrollStreakState) {
+  if (!streakState.lastCompletedDate) return 0;
+  const today = getLocalDateKey();
+  const yesterday = getLocalDateKey(new Date(Date.now() - 864e5));
+  if (
+    streakState.lastCompletedDate !== today &&
+    streakState.lastCompletedDate !== yesterday
+  ) {
+    return 0;
+  }
+  return streakState.streakCount;
+}
+
 const styles = StyleSheet.create({
   list: {
     padding: spacing.lg,
@@ -512,6 +862,10 @@ const styles = StyleSheet.create({
   header: {
     gap: spacing.md,
     marginBottom: spacing.lg
+  },
+  strollHeader: {
+    gap: spacing.sm,
+    marginBottom: spacing.sm
   },
   brandRow: {
     alignItems: "center",
@@ -691,13 +1045,62 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.8
   },
-  strollCard: {
-    gap: spacing.md
+  strollExperience: {
+    flex: 1,
+    gap: spacing.sm,
+    minHeight: 0,
+    position: "relative"
   },
-  strollImage: {
-    aspectRatio: 1,
+  strollExperienceCompact: {
+    gap: spacing.xs
+  },
+  strollStateSlot: {
+    flex: 1,
+    minHeight: 0
+  },
+  strollCard: {
+    alignItems: "stretch",
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    elevation: 2,
+    flex: 1,
+    gap: spacing.sm,
+    minHeight: 0,
+    overflow: "visible",
+    padding: spacing.md,
+    shadowColor: colors.ink,
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14
+  },
+  strollCardCompact: {
+    gap: spacing.xs,
+    padding: spacing.sm
+  },
+  strollImageButton: {
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    justifyContent: "center",
+    minHeight: 0
+  },
+  strollImageFrame: {
+    alignSelf: "stretch",
+    aspectRatio: 1.25,
     backgroundColor: colors.paper2,
     borderRadius: 8,
+    flexShrink: 1,
+    minHeight: 0,
+    overflow: "hidden",
+    width: "100%"
+  },
+  strollImage: {
+    flexShrink: 1,
+    height: "100%",
+    maxHeight: "100%",
+    minHeight: 0,
     width: "100%"
   },
   imageFallback: {
@@ -705,7 +1108,22 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   strollBody: {
-    gap: spacing.md
+    flexShrink: 0,
+    minWidth: 0,
+    gap: spacing.xs
+  },
+  strollTitle: {
+    color: colors.ink,
+    flexShrink: 0,
+    fontSize: 22,
+    fontWeight: "800",
+    lineHeight: 27,
+    minHeight: 54
+  },
+  strollTitleCompact: {
+    fontSize: 19,
+    lineHeight: 23,
+    minHeight: 46
   },
   stoopyRow: {
     alignItems: "center",
@@ -731,9 +1149,11 @@ const styles = StyleSheet.create({
     lineHeight: 18
   },
   strollMetaRow: {
+    alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.sm
+    gap: spacing.xs,
+    flexShrink: 0
   },
   pricePill: {
     backgroundColor: colors.forest,
@@ -743,13 +1163,13 @@ const styles = StyleSheet.create({
   },
   pricePillText: {
     color: colors.card,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "900"
   },
   categoryPill: {
     backgroundColor: colors.paper2,
     borderRadius: 999,
-    maxWidth: "55%",
+    maxWidth: "48%",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs
   },
@@ -769,29 +1189,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900"
   },
-  conditionBox: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: spacing.xs,
-    padding: spacing.md
+  originRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+    gap: spacing.xs
   },
-  conditionLabel: {
-    color: colors.forest,
-    fontSize: 12,
-    fontWeight: "900",
-    textTransform: "uppercase"
-  },
-  conditionText: {
+  originText: {
     color: colors.ink2,
-    fontSize: 15,
-    fontWeight: "800",
-    lineHeight: 21
+    flex: 1,
+    fontSize: 13,
+    fontStyle: "italic",
+    fontWeight: "700",
+    lineHeight: 18
   },
   strollActions: {
     flexDirection: "row",
-    gap: spacing.sm
+    flexShrink: 0,
+    gap: spacing.sm,
+    paddingTop: spacing.xs
   },
   strollActionButton: {
     flex: 1

@@ -13,6 +13,7 @@ import {
 
 import { createShopifyCart, fetchProduct } from "../../api/shopify";
 import { AppButton } from "../../components/AppButton";
+import { OrderFullInlineNote } from "../../components/OrderFullNotice";
 import { Screen } from "../../components/Screen";
 import { StoopyMascot } from "../../components/StoopyMascot";
 import { DEFAULT_PICKUP, ORDER_LIMIT } from "../../constants/pickup";
@@ -37,6 +38,7 @@ export function CartScreen({ navigation }: Props) {
   const [email, setEmail] = useState(customer.email);
   const [phone, setPhone] = useState(customer.phone);
   const [checkingOut, setCheckingOut] = useState(false);
+  const orderFull = totalQuantity >= ORDER_LIMIT;
 
   const customerValid = useMemo(
     () => name.trim() && email.includes("@") && phone.trim().length >= 7,
@@ -147,6 +149,7 @@ export function CartScreen({ navigation }: Props) {
           />
         </View>
       </View>
+      {orderFull ? <OrderFullInlineNote /> : null}
       <View style={styles.items}>
         {items.map((item) => (
           <View key={item.product.variantId} style={styles.itemRow}>

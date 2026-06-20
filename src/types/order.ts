@@ -1,4 +1,5 @@
 import type { Product } from "./product";
+import type { ReservationStatus } from "../api/reservations";
 
 export type CartItem = {
   product: Product;
@@ -23,4 +24,11 @@ export type OrderConfirmation = {
   customer: CustomerInfo;
   items: CartItem[];
   confirmedAt: string;
+  reservation?: {
+    id: string;
+    passCode: string;
+    status: ReservationStatus;
+    confirmBy: string;
+    pickupAt: string;
+  };
 };
