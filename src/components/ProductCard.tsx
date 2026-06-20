@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "./AppButton";
 import { colors } from "../theme/colors";
@@ -10,6 +11,8 @@ type ProductCardProps = {
   onPress: () => void;
   onAdd?: () => void;
   inOrder?: boolean;
+  imageVisible?: boolean;
+  lazyImage?: boolean;
   wide?: boolean;
 };
 
@@ -18,6 +21,8 @@ export function ProductCard({
   onPress,
   onAdd,
   inOrder,
+  imageVisible,
+  lazyImage,
   wide
 }: ProductCardProps) {
   const image = product.images[0];
@@ -43,7 +48,11 @@ export function ProductCard({
       >
         <View style={[styles.imageWrap, { backgroundColor: imageTint }]}>
           {image ? (
-            <Image source={{ uri: image }} style={styles.image} resizeMode="cover" />
+            <LazyProductImage
+              lazy={lazyImage}
+              uri={image}
+              visible={imageVisible ?? !lazyImage}
+            />
           ) : (
             <View style={styles.placeholderWrap}>
               <Text style={styles.placeholderIcon}>{fallbackLabel}</Text>
@@ -92,6 +101,80 @@ export function ProductCard({
   );
 }
 
+function LazyProductImage({
+  lazy,
+  uri,
+  visible
+}: {
+  lazy?: boolean;
+  uri: string;
+  visible: boolean;
+}) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(lazy && !visible ? 0 : 1)).current;
+  const [shouldRender, setShouldRender] = useState(!lazy || visible);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!lazy || visible) {
+      setShouldRender(true);
+    }
+  }, [lazy, visible]);
+
+  useEffect(() => {
+    if (!lazy || !visible || !loaded) return;
+
+    Animated.timing(fade, {
+      duration: 320,
+      toValue: 1,
+      useNativeDriver: true
+    }).start();
+  }, [fade, lazy, loaded, visible]);
+
+  useEffect(() => {
+    if (!lazy || (visible && loaded)) return;
+
+    shimmer.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(shimmer, {
+        duration: 1050,
+        toValue: 1,
+        useNativeDriver: true
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [lazy, loaded, shimmer, visible]);
+
+  const shimmerTranslate = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-180, 180]
+  });
+
+  return (
+    <>
+      {lazy && (!visible || !loaded) ? (
+        <View style={styles.skeleton}>
+          <Animated.View
+            style={[
+              styles.skeletonShine,
+              { transform: [{ translateX: shimmerTranslate }, { rotate: "18deg" }] }
+            ]}
+          />
+        </View>
+      ) : null}
+      {shouldRender ? (
+        <Animated.Image
+          source={{ uri }}
+          onLoad={() => setLoaded(true)}
+          resizeMode="cover"
+          style={[styles.image, lazy && { opacity: fade }]}
+        />
+      ) : null}
+    </>
+  );
+}
+
 function tintForCategory(category: string) {
   const normalized = category.toLowerCase();
   if (normalized.includes("kid") || normalized.includes("toy")) return "#F7EBD8";
@@ -131,6 +214,23 @@ const styles = StyleSheet.create({
   image: {
     height: "100%",
     width: "100%"
+  },
+  skeleton: {
+    backgroundColor: colors.paper2,
+    bottom: 0,
+    left: 0,
+    overflow: "hidden",
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  skeletonShine: {
+    backgroundColor: "rgba(255,255,255,0.56)",
+    height: "140%",
+    left: "38%",
+    position: "absolute",
+    top: "-20%",
+    width: 56
   },
   placeholderWrap: {
     alignItems: "center",

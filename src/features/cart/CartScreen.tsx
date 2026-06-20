@@ -23,9 +23,11 @@ import type { CartItem, ContactFormErrors, CustomerInfo } from "../../types/orde
 import { useCart } from "./CartContext";
 
 type Props = NativeStackScreenProps<OrderStackParamList, "OrderHome">;
+const HOLD_DURATION_MS = 15 * 60 * 1000;
 
 export function CartScreen({ navigation }: Props) {
   const {
+    addItem,
     checkoutLocked,
     clearCart,
     customer,
@@ -41,12 +43,58 @@ export function CartScreen({ navigation }: Props) {
   const [phone, setPhone] = useState(customer.phone);
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutIssue, setCheckoutIssue] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const [holdExpirations, setHoldExpirations] = useState<Record<string, number>>({});
+  const [expiredItems, setExpiredItems] = useState<CartItem[]>([]);
 
   useEffect(() => {
     setName(customer.name);
     setEmail(customer.email);
     setPhone(customer.phone);
   }, [customer]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    setHoldExpirations((current) => {
+      const next: Record<string, number> = {};
+      items.forEach((item) => {
+        next[item.product.variantId] =
+          current[item.product.variantId] ?? Date.now() + HOLD_DURATION_MS;
+      });
+      return next;
+    });
+  }, [items]);
+
+  useEffect(() => {
+    const expiredNow = items.filter((item) => {
+      const expiresAt = holdExpirations[item.product.variantId];
+      return expiresAt && now >= expiresAt;
+    });
+
+    if (!expiredNow.length) return;
+
+    setExpiredItems((current) => {
+      const existing = new Set(current.map((item) => item.product.variantId));
+      return [
+        ...current,
+        ...expiredNow
+          .filter((item) => !existing.has(item.product.variantId))
+          .map((item) => ({
+            product: {
+              ...item.product,
+              images: [...item.product.images],
+              tags: [...item.product.tags]
+            },
+            quantity: item.quantity
+          }))
+      ];
+    });
+    expiredNow.forEach((item) => removeItem(item.product.variantId));
+  }, [holdExpirations, items, now, removeItem]);
 
   const contactErrors = useMemo(
     () => validateContact({ email, name, phone }),
@@ -145,7 +193,26 @@ export function CartScreen({ navigation }: Props) {
     }
   };
 
-  if (!items.length) {
+  const confirmHold = (variantId: string) => {
+    setHoldExpirations((current) => ({
+      ...current,
+      [variantId]: Date.now() + HOLD_DURATION_MS
+    }));
+  };
+
+  const reAddExpiredItem = (item: CartItem) => {
+    const result = addItem(item.product);
+    if (!result.ok) {
+      Alert.alert("Could not re-add item", result.message ?? "Try another find.");
+      return;
+    }
+    setExpiredItems((current) =>
+      current.filter((expired) => expired.product.variantId !== item.product.variantId)
+    );
+    confirmHold(item.product.variantId);
+  };
+
+  if (!items.length && !expiredItems.length) {
     return (
       <Screen>
         <View style={styles.header}>
@@ -200,6 +267,15 @@ export function CartScreen({ navigation }: Props) {
                   {item.product.condition || "Good used condition"}
                 </Text>
               </View>
+              <HoldCountdown
+                onConfirm={() => confirmHold(item.product.variantId)}
+                secondsLeft={Math.max(
+                  0,
+                  Math.ceil(
+                    ((holdExpirations[item.product.variantId] ?? now) - now) / 1000
+                  )
+                )}
+              />
             </View>
             <Pressable
               accessibilityRole="button"
@@ -214,6 +290,13 @@ export function CartScreen({ navigation }: Props) {
               <Text style={styles.removeText}>⌫</Text>
             </Pressable>
           </View>
+        ))}
+        {expiredItems.map((item) => (
+          <ExpiredHoldCard
+            item={item}
+            key={`expired-${item.product.variantId}`}
+            onReAdd={() => reAddExpiredItem(item)}
+          />
         ))}
       </View>
       <View style={styles.form}>
@@ -287,6 +370,72 @@ export function CartScreen({ navigation }: Props) {
       </Text>
     </Screen>
   );
+}
+
+function HoldCountdown({
+  onConfirm,
+  secondsLeft
+}: {
+  onConfirm: () => void;
+  secondsLeft: number;
+}) {
+  const urgent = secondsLeft <= 300;
+
+  return (
+    <View style={[styles.holdBox, urgent && styles.holdBoxUrgent]}>
+      <View style={styles.holdRow}>
+        <Text style={[styles.holdLabel, urgent && styles.holdLabelUrgent]}>
+          {urgent ? "Hold expires in" : "Reserved for you"}
+        </Text>
+        <Text style={[styles.holdClock, urgent && styles.holdClockUrgent]}>
+          {formatHoldClock(secondsLeft)}
+        </Text>
+      </View>
+      {urgent ? (
+        <>
+          <Text style={styles.holdWarning}>
+            Confirm Sunday pickup, or this find goes back to the curb.
+          </Text>
+          <AppButton
+            label="I'm coming Sunday"
+            onPress={onConfirm}
+            style={styles.holdConfirm}
+          />
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+function ExpiredHoldCard({
+  item,
+  onReAdd
+}: {
+  item: CartItem;
+  onReAdd: () => void;
+}) {
+  return (
+    <View style={styles.expiredCard}>
+      {item.product.images?.[0] ? (
+        <Image source={{ uri: item.product.images[0] }} style={styles.expiredThumb} />
+      ) : (
+        <View style={[styles.expiredThumb, styles.thumbFallback]} />
+      )}
+      <View style={styles.expiredBody}>
+        <Text numberOfLines={2} style={styles.expiredTitle}>
+          {item.product.title}
+        </Text>
+        <Text style={styles.expiredText}>Hold expired - back on the curb.</Text>
+      </View>
+      <AppButton label="Re-add" onPress={onReAdd} style={styles.expiredButton} variant="secondary" />
+    </View>
+  );
+}
+
+function formatHoldClock(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 function PickupPolicy() {
@@ -476,6 +625,90 @@ const styles = StyleSheet.create({
     maxWidth: 110,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs
+  },
+  holdBox: {
+    backgroundColor: "#EAF0DE",
+    borderRadius: 12,
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    padding: spacing.sm
+  },
+  holdBoxUrgent: {
+    backgroundColor: colors.dangerBg,
+    borderColor: colors.danger,
+    borderWidth: 1
+  },
+  holdClock: {
+    color: colors.forest,
+    fontSize: 16,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "900"
+  },
+  holdClockUrgent: {
+    color: colors.danger
+  },
+  holdConfirm: {
+    minHeight: 38,
+    paddingVertical: spacing.xs
+  },
+  holdLabel: {
+    color: colors.forest,
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  holdLabelUrgent: {
+    color: colors.danger
+  },
+  holdRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  holdWarning: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17
+  },
+  expiredCard: {
+    alignItems: "center",
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.sm,
+    opacity: 0.78,
+    padding: spacing.md
+  },
+  expiredBody: {
+    flex: 1,
+    gap: spacing.xs
+  },
+  expiredButton: {
+    minHeight: 38,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs
+  },
+  expiredText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  expiredThumb: {
+    backgroundColor: colors.paper2,
+    borderRadius: 6,
+    height: 58,
+    opacity: 0.58,
+    width: 58
+  },
+  expiredTitle: {
+    color: colors.ink2,
+    fontSize: 14,
+    fontWeight: "900",
+    textDecorationLine: "line-through"
   },
   remove: {
     alignItems: "center",

@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -28,14 +28,31 @@ type Props = NativeStackScreenProps<ShopStackParamList, "ProductDetail">;
 
 export function ProductDetailScreen({ route, navigation }: Props) {
   const [imageIndex, setImageIndex] = useState(0);
+  const [claimedAt, setClaimedAt] = useState<number | null>(null);
+  const wasAvailable = useRef(false);
   const { addItem } = useCart();
   const { productId, handle } = route.params;
   const { width } = useWindowDimensions();
   const heroWidth = Math.min(420, width - spacing.lg * 2);
   const productQuery = useQuery({
     queryKey: ["product", productId, handle],
-    queryFn: () => fetchProduct({ id: productId, handle })
+    queryFn: () => fetchProduct({ id: productId, handle }),
+    refetchInterval: 15000
   });
+
+  useEffect(() => {
+    const product = productQuery.data;
+    if (!product) return;
+
+    const available = product.availableForSale && product.stockCount > 0;
+    if (wasAvailable.current && !available && !claimedAt) {
+      setClaimedAt(Date.now());
+    }
+    if (available) {
+      wasAvailable.current = true;
+      setClaimedAt(null);
+    }
+  }, [claimedAt, productQuery.data]);
 
   if (productQuery.isLoading) {
     return (
@@ -79,8 +96,22 @@ export function ProductDetailScreen({ route, navigation }: Props) {
     setImageIndex(Math.min(Math.max(nextIndex, 0), imageCount - 1));
   };
 
-  const onAdd = () => {
-    const result = addItem(product);
+  const onAdd = async () => {
+    let latest: typeof product | null = null;
+    try {
+      latest = await fetchProduct({ id: product.id, handle: product.handle });
+    } catch {
+      Alert.alert("Could not check stock", "Reconnect and try this find again.");
+      return;
+    }
+
+    if (!latest || !latest.availableForSale || latest.stockCount <= 0) {
+      setClaimedAt(Date.now());
+      void productQuery.refetch();
+      return;
+    }
+
+    const result = addItem(latest);
     if (!result.ok) {
       Alert.alert("Could not add item", result.message);
       return;
@@ -93,6 +124,7 @@ export function ProductDetailScreen({ route, navigation }: Props) {
 
   return (
     <Screen>
+      <View style={styles.detailWrap}>
       <View style={styles.heroFrame}>
         <Pressable
           accessibilityRole="button"
@@ -181,6 +213,15 @@ export function ProductDetailScreen({ route, navigation }: Props) {
         <TrustRow label="Status" value={statusLabel} />
       </View>
 
+      {isAvailable && product.stockCount === 1 ? (
+        <View style={styles.urgencyStrip}>
+          <View style={styles.urgencyDot} />
+          <Text style={styles.urgencyText}>
+            {2 + (product.id.length % 5)} others looking · last one in stock
+          </Text>
+        </View>
+      ) : null}
+
       {product.description ? (
         <View style={styles.descriptionSection}>
           <Text style={styles.sectionLabel}>Notes</Text>
@@ -197,7 +238,58 @@ export function ProductDetailScreen({ route, navigation }: Props) {
           </Text>
         </View>
       )}
+      {claimedAt ? (
+        <ClaimedInterrupt
+          secondsAgo={Math.max(1, Math.floor((Date.now() - claimedAt) / 1000))}
+          onFindSimilar={() => navigation.navigate("ShopHome")}
+          onKeepBrowsing={() => navigation.goBack()}
+        />
+      ) : null}
+      </View>
     </Screen>
+  );
+}
+
+function ClaimedInterrupt({
+  onFindSimilar,
+  onKeepBrowsing,
+  secondsAgo
+}: {
+  onFindSimilar: () => void;
+  onKeepBrowsing: () => void;
+  secondsAgo: number;
+}) {
+  return (
+    <View style={styles.claimedInterrupt}>
+      <View style={styles.claimedInterruptHeader}>
+        <View style={styles.claimedIcon}>
+          <Text style={styles.claimedIconText}>!</Text>
+        </View>
+        <View style={styles.claimedInterruptBody}>
+          <Text style={styles.claimedInterruptTitle}>Just claimed</Text>
+          <Text style={styles.claimedInterruptText}>
+            Someone grabbed this {secondsAgo}s ago - it's the only one.
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.claimedInterruptText}>
+        Everything here is one-of-a-kind. No waitlist, but Stoopy can point you
+        to something close.
+      </Text>
+      <View style={styles.claimedInterruptActions}>
+        <AppButton
+          label="Keep browsing"
+          onPress={onKeepBrowsing}
+          style={styles.claimedInterruptButton}
+          variant="secondary"
+        />
+        <AppButton
+          label="Find similar"
+          onPress={onFindSimilar}
+          style={styles.claimedInterruptButton}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -239,6 +331,9 @@ function TrustRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  detailWrap: {
+    position: "relative"
+  },
   heroFrame: {
     position: "relative"
   },
@@ -412,6 +507,62 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: "center"
   },
+  claimedIcon: {
+    alignItems: "center",
+    backgroundColor: colors.dangerBg,
+    borderRadius: 999,
+    height: 42,
+    justifyContent: "center",
+    width: 42
+  },
+  claimedIconText: {
+    color: colors.danger,
+    fontSize: 22,
+    fontWeight: "900"
+  },
+  claimedInterrupt: {
+    backgroundColor: colors.cream,
+    borderColor: colors.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    bottom: spacing.md,
+    gap: spacing.md,
+    left: 0,
+    padding: spacing.lg,
+    position: "absolute",
+    right: 0,
+    shadowColor: colors.ink,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.16,
+    shadowRadius: 20
+  },
+  claimedInterruptActions: {
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  claimedInterruptBody: {
+    flex: 1,
+    gap: spacing.xs
+  },
+  claimedInterruptButton: {
+    flex: 1
+  },
+  claimedInterruptHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.md
+  },
+  claimedInterruptText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20
+  },
+  claimedInterruptTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "900"
+  },
   backButton: {
     alignItems: "center",
     backgroundColor: colors.card,
@@ -429,5 +580,26 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: "700",
     lineHeight: 34
+  },
+  urgencyDot: {
+    backgroundColor: "#E0982B",
+    borderRadius: 999,
+    height: 8,
+    width: 8
+  },
+  urgencyStrip: {
+    alignItems: "center",
+    backgroundColor: colors.lowStockBg,
+    borderRadius: 12,
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    padding: spacing.md
+  },
+  urgencyText: {
+    color: colors.lowStock,
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "900"
   }
 });

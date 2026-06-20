@@ -1,12 +1,23 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import * as Notifications from "expo-notifications";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from "react";
 import {
   Alert,
   FlatList,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Pressable,
   RefreshControl,
   ScrollView,
+  type ScrollViewProps,
   StyleSheet,
   Text,
   TextInput,
@@ -21,6 +32,7 @@ import { Screen } from "../../components/Screen";
 import { StateView } from "../../components/StateView";
 import { StoopyMascot } from "../../components/StoopyMascot";
 import { ORDER_LIMIT } from "../../constants/pickup";
+import { requestNotificationPermission } from "../notifications/notificationUtils";
 import { useCart } from "../cart/CartContext";
 import type { ShopStackParamList } from "../../navigation/types";
 import { colors } from "../../theme/colors";
@@ -233,36 +245,18 @@ export function ShopScreen({ navigation }: Props) {
   if (mode === "Collections") {
     return (
       <Screen scroll={false}>
-        <ScrollView
-          contentContainerStyle={styles.list}
-          keyboardShouldPersistTaps="handled"
+        <CollectionsBrowser
+          groups={collectionGroups}
+          header={header}
+          inOrder={isInOrder}
+          loadingMore={productsQuery.isFetchingNextPage}
+          onAdd={addProduct}
+          onLoadMore={() => void productsQuery.fetchNextPage()}
+          onPress={openProduct}
           refreshControl={refreshControl}
-        >
-          {header}
-          {collectionGroups.length ? (
-            collectionGroups.map((group) => (
-              <CollectionShelf
-                inOrder={isInOrder}
-                key={group.category}
-                onAdd={addProduct}
-                onPress={openProduct}
-                products={group.products}
-                title={group.category}
-              />
-            ))
-          ) : (
-            <NoResultsView search={search} />
-          )}
-          {productsQuery.hasNextPage ? (
-            <AppButton
-              label="Load more finds"
-              loading={productsQuery.isFetchingNextPage}
-              onPress={() => void productsQuery.fetchNextPage()}
-              style={styles.loadMore}
-              variant="secondary"
-            />
-          ) : null}
-        </ScrollView>
+          search={search}
+          showLoadMore={Boolean(productsQuery.hasNextPage)}
+        />
       </Screen>
     );
   }
@@ -299,43 +293,283 @@ export function ShopScreen({ navigation }: Props) {
   );
 }
 
-function CollectionShelf({
+function CollectionsBrowser({
+  groups,
+  header,
   inOrder,
+  loadingMore,
   onAdd,
+  onLoadMore,
   onPress,
-  products,
-  title
+  refreshControl,
+  search,
+  showLoadMore
 }: {
+  groups: Array<{ category: string; products: Product[] }>;
+  header: ReactNode;
   inOrder: (product: Product) => boolean;
+  loadingMore: boolean;
   onAdd: (product: Product) => void;
+  onLoadMore: () => void;
   onPress: (product: Product) => void;
-  products: Product[];
-  title: string;
+  refreshControl: ScrollViewProps["refreshControl"];
+  search?: string;
+  showLoadMore: boolean;
 }) {
+  const scrollRef = useRef<ScrollView | null>(null);
+  const chipScrollRef = useRef<ScrollView | null>(null);
+  const programmaticScroll = useRef(false);
+  const programmaticTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sectionOffsets = useRef<Record<string, number>>({});
+  const chipMetrics = useRef<Record<string, { width: number; x: number }>>({});
+  const [activeCategory, setActiveCategory] = useState(groups[0]?.category ?? "");
+  const [barHeight, setBarHeight] = useState(58);
+  const [chipBarWidth, setChipBarWidth] = useState(0);
+  const [showTop, setShowTop] = useState(false);
+  const [visibleImageIds, setVisibleImageIds] = useState<Set<string>>(() => new Set());
+  const categories = useMemo(
+    () => groups.filter((group) => group.products.length > 0),
+    [groups]
+  );
+
+  useEffect(() => {
+    setActiveCategory((current) =>
+      categories.some((group) => group.category === current)
+        ? current
+        : categories[0]?.category ?? ""
+    );
+  }, [categories]);
+
+  useEffect(
+    () => () => {
+      if (programmaticTimer.current) clearTimeout(programmaticTimer.current);
+    },
+    []
+  );
+
+  const updateVisibleImages = useCallback((
+    scrollY: number,
+    viewportHeight: number
+  ) => {
+    if (!categories.length || !viewportHeight) return;
+    const nextVisible = new Set<string>();
+    const lower = scrollY - 220;
+    const upper = scrollY + viewportHeight + 220;
+
+    categories.forEach((group) => {
+      const sectionTop = sectionOffsets.current[group.category] ?? 0;
+      group.products.forEach((product, index) => {
+        const row = Math.floor(index / 2);
+        const estimatedTop = sectionTop + 58 + row * 318;
+        const estimatedBottom = estimatedTop + 318;
+        if (estimatedTop <= upper && estimatedBottom >= lower) {
+          nextVisible.add(product.variantId);
+        }
+      });
+    });
+
+    setVisibleImageIds((current) => {
+      let changed = false;
+      nextVisible.forEach((id) => {
+        if (!current.has(id)) changed = true;
+      });
+      if (!changed) return current;
+      return new Set([...current, ...nextVisible]);
+    });
+  }, [categories]);
+
+  const centerChip = useCallback((category: string) => {
+    const metric = chipMetrics.current[category];
+    if (!metric || !chipBarWidth) return;
+    chipScrollRef.current?.scrollTo({
+      animated: true,
+      x: Math.max(0, metric.x - chipBarWidth / 2 + metric.width / 2)
+    });
+  }, [chipBarWidth]);
+
+  useEffect(() => {
+    if (activeCategory) centerChip(activeCategory);
+  }, [activeCategory, centerChip]);
+
+  const onScroll = useCallback((
+    event: NativeSyntheticEvent<NativeScrollEvent>
+  ) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    const viewportHeight = event.nativeEvent.layoutMeasurement.height;
+    setShowTop(scrollY > 480);
+    updateVisibleImages(scrollY, viewportHeight);
+
+    if (programmaticScroll.current || !categories.length) return;
+    const anchorY = scrollY + barHeight + 80;
+    let nextCategory = categories[0].category;
+
+    categories.forEach((group) => {
+      const offset = sectionOffsets.current[group.category];
+      if (typeof offset === "number" && offset <= anchorY) {
+        nextCategory = group.category;
+      }
+    });
+    setActiveCategory((current) =>
+      current === nextCategory ? current : nextCategory
+    );
+  }, [barHeight, categories, updateVisibleImages]);
+
+  const jumpToCategory = useCallback((category: string) => {
+    const offset = sectionOffsets.current[category];
+    if (typeof offset !== "number") return;
+
+    setActiveCategory(category);
+    programmaticScroll.current = true;
+    if (programmaticTimer.current) clearTimeout(programmaticTimer.current);
+    scrollRef.current?.scrollTo({
+      animated: true,
+      y: Math.max(0, offset - barHeight)
+    });
+    programmaticTimer.current = setTimeout(() => {
+      programmaticScroll.current = false;
+    }, 620);
+  }, [barHeight]);
+
+  if (!categories.length) {
+    return (
+      <ScrollView
+        contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={refreshControl}
+      >
+        {header}
+        <NoResultsView search={search} />
+      </ScrollView>
+    );
+  }
+
   return (
-    <View style={styles.shelf}>
-      <View style={styles.shelfHeader}>
-        <Text style={styles.shelfTitle}>{title}</Text>
-        <Text style={styles.shelfCount}>{products.length} finds</Text>
-      </View>
-      <View style={styles.shelfGrid}>
-        {products.map((product) => (
-          <View key={product.variantId} style={styles.shelfCardSlot}>
-            <ProductCard
-              inOrder={inOrder(product)}
-              onAdd={() => onAdd(product)}
-              onPress={() => onPress(product)}
-              product={product}
+    <View style={styles.collectionsWrap}>
+      <ScrollView
+        ref={scrollRef}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => updateVisibleImages(0, 740)}
+        onLayout={(event) =>
+          updateVisibleImages(0, event.nativeEvent.layout.height)
+        }
+        onScroll={onScroll}
+        refreshControl={refreshControl}
+        scrollEventThrottle={16}
+        stickyHeaderIndices={[1]}
+      >
+        <View style={styles.list}>{header}</View>
+        <View
+          onLayout={(event) => setBarHeight(event.nativeEvent.layout.height)}
+          style={styles.collectionChipDock}
+        >
+          <ScrollView
+            ref={chipScrollRef}
+            contentContainerStyle={styles.collectionChipList}
+            horizontal
+            onLayout={(event) => setChipBarWidth(event.nativeEvent.layout.width)}
+            showsHorizontalScrollIndicator={false}
+          >
+            {categories.map((group) => {
+              const selected = group.category === activeCategory;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={group.category}
+                  onLayout={(event) => {
+                    chipMetrics.current[group.category] = {
+                      width: event.nativeEvent.layout.width,
+                      x: event.nativeEvent.layout.x
+                    };
+                  }}
+                  onPress={() => jumpToCategory(group.category)}
+                  style={[
+                    styles.collectionChip,
+                    selected && styles.collectionChipActive
+                  ]}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.collectionChipText,
+                      selected && styles.collectionChipTextActive
+                    ]}
+                  >
+                    {group.category}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.collectionChipCount,
+                      selected && styles.collectionChipCountActive
+                    ]}
+                  >
+                    {group.products.length}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+        <View style={styles.collectionSections}>
+          {categories.map((group) => (
+            <View
+              key={group.category}
+              onLayout={(event) => {
+                sectionOffsets.current[group.category] = event.nativeEvent.layout.y;
+              }}
+              style={styles.collectionSection}
+            >
+              <View style={styles.shelfHeader}>
+                <Text style={styles.shelfTitle}>{group.category}</Text>
+                <Text style={styles.shelfCount}>
+                  {group.products.length} {group.products.length === 1 ? "find" : "finds"}
+                </Text>
+              </View>
+              <View style={styles.shelfGrid}>
+                {group.products.map((product) => (
+                  <View key={product.variantId} style={styles.shelfCardSlot}>
+                    <ProductCard
+                      imageVisible={visibleImageIds.has(product.variantId)}
+                      inOrder={inOrder(product)}
+                      lazyImage
+                      onAdd={() => onAdd(product)}
+                      onPress={() => onPress(product)}
+                      product={product}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
+          {showLoadMore ? (
+            <AppButton
+              label="Load more finds"
+              loading={loadingMore}
+              onPress={onLoadMore}
+              style={styles.loadMore}
+              variant="secondary"
             />
-          </View>
-        ))}
-      </View>
+          ) : null}
+        </View>
+      </ScrollView>
+      {showTop ? (
+        <Pressable
+          accessibilityLabel="Back to top"
+          accessibilityRole="button"
+          onPress={() => scrollRef.current?.scrollTo({ animated: true, y: 0 })}
+          style={styles.backToTop}
+        >
+          <Text style={styles.backToTopText}>Top</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
 function NoResultsView({ search }: { search?: string }) {
   const hasSearch = Boolean(search?.trim());
+  if (!hasSearch) return <BetweenDropsView />;
+
   return (
     <View style={styles.noResults}>
       <StoopyMascot
@@ -344,15 +578,125 @@ function NoResultsView({ search }: { search?: string }) {
         size="medium"
       />
       <Text style={styles.noResultsTitle}>
-        {hasSearch ? "Nothing matches that search" : "No free finds available"}
+        Nothing matches that search
       </Text>
       <Text style={styles.noResultsMessage}>
-        {hasSearch
-          ? "Try a different word or clear search. Inventory changes every week as new reusable finds come in."
-          : "Everything currently listed has been claimed. Check back before the next Sunday pickup drop."}
+        Try a different word or clear search. Inventory changes every week as new
+        reusable finds come in.
       </Text>
     </View>
   );
+}
+
+function BetweenDropsView() {
+  const [secondsToDrop, setSecondsToDrop] = useState(getSecondsToNextDrop());
+  const [notify, setNotify] = useState(false);
+  const [notifyBusy, setNotifyBusy] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecondsToDrop(Math.max(0, getSecondsToNextDrop()));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const days = Math.floor(secondsToDrop / 86400);
+  const hours = Math.floor((secondsToDrop % 86400) / 3600);
+  const minutes = Math.floor((secondsToDrop % 3600) / 60);
+  const seconds = secondsToDrop % 60;
+  const toggleNotify = async () => {
+    if (notifyBusy) return;
+
+    setNotifyBusy(true);
+    try {
+      if (notify) {
+        await Notifications.cancelScheduledNotificationAsync(
+          "stooping-next-drop-reminder"
+        );
+        setNotify(false);
+        return;
+      }
+
+      const permission = await requestNotificationPermission();
+      if (permission !== "granted") {
+        Alert.alert(
+          "Notifications are off",
+          "You can still check back Sunday at 2 PM for the next drop."
+        );
+        return;
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        identifier: "stooping-next-drop-reminder",
+        content: {
+          title: "Stooping Club drop is live",
+          body: "Fresh free reuse finds are landing now. Open the shop before they move.",
+          sound: "default"
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: getNextDropDate()
+        }
+      });
+      setNotify(true);
+    } finally {
+      setNotifyBusy(false);
+    }
+  };
+
+  return (
+    <View style={styles.betweenDrops}>
+      <StoopyMascot caption="" containerStyle={styles.betweenDropsMascot} size="large" />
+      <Text style={styles.noResultsTitle}>The curb's clear right now</Text>
+      <Text style={styles.noResultsMessage}>
+        Every find from the last drop found a home. Fresh reuse drops land Sunday
+        at 2 PM, and Stoopy is already scouting.
+      </Text>
+      <View style={styles.countdownRow}>
+        <CountdownUnit label="DAYS" value={days} />
+        <CountdownUnit label="HRS" value={hours} />
+        <CountdownUnit label="MIN" value={minutes} />
+        <CountdownUnit label="SEC" value={seconds} />
+      </View>
+      <AppButton
+        label={notify ? "You'll be first to know" : "Notify me when it drops"}
+        loading={notifyBusy}
+        onPress={toggleNotify}
+        style={styles.notifyButton}
+        variant={notify ? "accent" : "primary"}
+      />
+      <Text style={styles.notifyFinePrint}>One local reminder. No spam.</Text>
+    </View>
+  );
+}
+
+function CountdownUnit({ label, value }: { label: string; value: number }) {
+  return (
+    <View style={styles.countdownUnit}>
+      <Text style={styles.countdownValue}>{String(value).padStart(2, "0")}</Text>
+      <Text style={styles.countdownLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function getSecondsToNextDrop() {
+  const nextDrop = getNextDropDate();
+  return Math.max(0, Math.floor((nextDrop.getTime() - Date.now()) / 1000));
+}
+
+function getNextDropDate() {
+  const now = new Date();
+  const nextDrop = new Date(now);
+  const day = nextDrop.getDay();
+  let daysUntilSunday = (7 - day) % 7;
+  nextDrop.setHours(14, 0, 0, 0);
+
+  if (daysUntilSunday === 0 && nextDrop <= now) {
+    daysUntilSunday = 7;
+  }
+
+  nextDrop.setDate(nextDrop.getDate() + daysUntilSunday);
+  return nextDrop;
 }
 
 function OfflineInventoryBanner({
@@ -587,6 +931,133 @@ const styles = StyleSheet.create({
   gridRow: {
     gap: spacing.md,
     marginBottom: spacing.md
+  },
+  betweenDrops: {
+    alignItems: "center",
+    gap: spacing.md,
+    justifyContent: "center",
+    minHeight: 540,
+    paddingHorizontal: spacing.lg
+  },
+  betweenDropsMascot: {
+    alignSelf: "center"
+  },
+  backToTop: {
+    alignItems: "center",
+    backgroundColor: colors.forest,
+    borderRadius: 999,
+    bottom: spacing.lg,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+    position: "absolute",
+    right: spacing.lg,
+    shadowColor: colors.ink,
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10
+  },
+  backToTopText: {
+    color: colors.card,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  collectionChip: {
+    alignItems: "center",
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.xs,
+    minHeight: 40,
+    paddingHorizontal: spacing.md
+  },
+  collectionChipActive: {
+    backgroundColor: colors.forest,
+    borderColor: colors.forest
+  },
+  collectionChipCount: {
+    color: colors.ink2,
+    fontSize: 12,
+    fontWeight: "900",
+    opacity: 0.55
+  },
+  collectionChipCountActive: {
+    color: colors.card,
+    opacity: 0.82
+  },
+  collectionChipDock: {
+    backgroundColor: "rgba(244,241,232,0.96)",
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    paddingVertical: spacing.sm,
+    zIndex: 20
+  },
+  collectionChipList: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg
+  },
+  collectionChipText: {
+    color: colors.ink2,
+    fontSize: 14,
+    fontWeight: "900",
+    maxWidth: 150
+  },
+  collectionChipTextActive: {
+    color: colors.card
+  },
+  collectionSections: {
+    padding: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxl
+  },
+  collectionSection: {
+    gap: spacing.md,
+    marginBottom: spacing.xl
+  },
+  collectionsWrap: {
+    flex: 1,
+    minHeight: 0,
+    position: "relative"
+  },
+  countdownLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0,
+    textAlign: "center"
+  },
+  countdownRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "center",
+    marginTop: spacing.sm
+  },
+  countdownUnit: {
+    alignItems: "center",
+    gap: spacing.xs
+  },
+  countdownValue: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    color: colors.ink,
+    fontSize: 25,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "900",
+    minWidth: 58,
+    paddingVertical: spacing.sm,
+    textAlign: "center"
+  },
+  notifyButton: {
+    marginTop: spacing.sm,
+    minWidth: 270
+  },
+  notifyFinePrint: {
+    color: colors.faint,
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center"
   },
   shelf: {
     gap: spacing.md,
