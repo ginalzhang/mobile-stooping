@@ -17,14 +17,15 @@ import stoopyHappyBody from "../../assets/brand/stoopy-happy-body.png";
 import stoopyHalo from "../../assets/brand/stoopy-halo.png";
 import stoopySad from "../../assets/brand/stoopy-sad.png";
 import stoopySadBody from "../../assets/brand/stoopy-sad-body.png";
-import stoopySadTears from "../../assets/brand/stoopy-sad-tears.png";
+import stoopySadTearLeft from "../../assets/brand/stoopy-sad-tear-left.png";
+import stoopySadTearRight from "../../assets/brand/stoopy-sad-tear-right.png";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/theme";
 
 export type StoopyMood = "happy" | "sad";
 
 type StoopyMascotProps = {
-  size?: "small" | "medium" | "large";
+  size?: "tiny" | "small" | "medium" | "large";
   caption?: string;
   mood?: StoopyMood;
   containerStyle?: StyleProp<ViewStyle>;
@@ -34,6 +35,7 @@ const BODY_ASPECT = 771 / 720;
 const HALO_ASPECT = 176 / 600;
 
 const mascotWidths = {
+  tiny: 48,
   small: 98,
   medium: 150,
   large: 200
@@ -73,7 +75,8 @@ function StoopyLayers({
   const [reduceMotion, setReduceMotion] = useState(false);
   const haloSway = useRef(new Animated.Value(0)).current;
   const sadShake = useRef(new Animated.Value(0)).current;
-  const tearFall = useRef(new Animated.Value(0)).current;
+  const tearLeft = useRef(new Animated.Value(0)).current;
+  const tearRight = useRef(new Animated.Value(0)).current;
   const sad = mood === "sad";
 
   useEffect(() => {
@@ -126,9 +129,11 @@ function StoopyLayers({
   useEffect(() => {
     if (!sad || reduceMotion) {
       sadShake.stopAnimation();
-      tearFall.stopAnimation();
+      tearLeft.stopAnimation();
+      tearRight.stopAnimation();
       sadShake.setValue(0);
-      tearFall.setValue(0);
+      tearLeft.setValue(0);
+      tearRight.setValue(0);
       return;
     }
 
@@ -162,32 +167,54 @@ function StoopyLayers({
         Animated.delay(760)
       ])
     );
-    const tearLoop = Animated.loop(
+    const tearLeftLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(tearFall, {
+        Animated.timing(tearLeft, {
           duration: 1180,
           easing: Easing.in(Easing.quad),
           toValue: 1,
           useNativeDriver: false
         }),
-        Animated.timing(tearFall, {
+        Animated.timing(tearLeft, {
           duration: 1,
           toValue: 0,
           useNativeDriver: false
         }),
-        Animated.delay(320)
+        Animated.delay(1820)
+      ])
+    );
+    const tearRightLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(tearRight, {
+          duration: 1180,
+          easing: Easing.in(Easing.quad),
+          toValue: 1,
+          useNativeDriver: false
+        }),
+        Animated.timing(tearRight, {
+          duration: 1,
+          toValue: 0,
+          useNativeDriver: false
+        }),
+        Animated.delay(1820)
       ])
     );
     shakeLoop.start();
-    tearLoop.start();
+    tearLeftLoop.start();
+    const tearRightTimer = setTimeout(() => {
+      tearRightLoop.start();
+    }, 1500);
 
     return () => {
       shakeLoop.stop();
-      tearLoop.stop();
+      tearLeftLoop.stop();
+      tearRightLoop.stop();
+      clearTimeout(tearRightTimer);
       sadShake.setValue(0);
-      tearFall.setValue(0);
+      tearLeft.setValue(0);
+      tearRight.setValue(0);
     };
-  }, [reduceMotion, sad, sadShake, tearFall]);
+  }, [reduceMotion, sad, sadShake, tearLeft, tearRight]);
 
   if (reduceMotion) {
     return (
@@ -219,11 +246,19 @@ function StoopyLayers({
     inputRange: [0, 1],
     outputRange: [0, width * 0.012]
   });
-  const tearTranslateY = tearFall.interpolate({
+  const tearLeftTranslateY = tearLeft.interpolate({
     inputRange: [0, 1],
     outputRange: [0, height * 0.16]
   });
-  const tearOpacity = tearFall.interpolate({
+  const tearLeftOpacity = tearLeft.interpolate({
+    inputRange: [0, 0.18, 0.72, 1],
+    outputRange: [1, 1, 0.65, 0]
+  });
+  const tearRightTranslateY = tearRight.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, height * 0.16]
+  });
+  const tearRightOpacity = tearRight.interpolate({
     inputRange: [0, 0.18, 0.72, 1],
     outputRange: [1, 1, 0.65, 0]
   });
@@ -266,20 +301,36 @@ function StoopyLayers({
           style={{ height, width }}
         />
         {sad ? (
-          <Animated.Image
-            accessibilityIgnoresInvertColors
-            resizeMode="contain"
-            source={stoopySadTears}
-            style={[
-              styles.layer,
-              {
-                height,
-                opacity: tearOpacity,
-                transform: [{ translateY: tearTranslateY }],
-                width
-              }
-            ]}
-          />
+          <>
+            <Animated.Image
+              accessibilityIgnoresInvertColors
+              resizeMode="contain"
+              source={stoopySadTearLeft}
+              style={[
+                styles.layer,
+                {
+                  height,
+                  opacity: tearLeftOpacity,
+                  transform: [{ translateY: tearLeftTranslateY }],
+                  width
+                }
+              ]}
+            />
+            <Animated.Image
+              accessibilityIgnoresInvertColors
+              resizeMode="contain"
+              source={stoopySadTearRight}
+              style={[
+                styles.layer,
+                {
+                  height,
+                  opacity: tearRightOpacity,
+                  transform: [{ translateY: tearRightTranslateY }],
+                  width
+                }
+              ]}
+            />
+          </>
         ) : null}
       </Animated.View>
     </View>

@@ -1,6 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { StyleSheet, Text, View } from "react-native";
-import QRCode from "react-native-qrcode-svg";
 
 import { AppButton } from "../../components/AppButton";
 import { Screen } from "../../components/Screen";
@@ -37,11 +36,14 @@ export function ConfirmationScreen({ navigation }: Props) {
   return (
     <Screen>
       <View style={styles.hero}>
-        <StoopyMascot caption="Pickup pal" size="small" />
-        <Text style={styles.check}>✓</Text>
-        <Text style={typography.h1}>Order started</Text>
-        <Text style={typography.body}>
-          Finish Shopify checkout if it opened, then watch for Stooping Club’s text or
+        <StoopyMascot caption="" containerStyle={styles.heroMascot} size="tiny" />
+        <Text style={styles.heroEyebrow}>Order started</Text>
+        <View style={styles.checkBadge}>
+          <Text style={styles.check}>✓</Text>
+        </View>
+        <Text style={styles.heroTitle}>You're in line for pickup</Text>
+        <Text style={styles.heroBody}>
+          Finish Shopify checkout if it opened, then watch for Stooping Club's text or
           email confirmation.
         </Text>
       </View>
@@ -63,18 +65,7 @@ export function ConfirmationScreen({ navigation }: Props) {
           <StoopyMascot caption="" size="small" />
         </View>
         <View style={styles.passBody}>
-          <View style={styles.qrBox}>
-            <QRCode
-              value={JSON.stringify({
-                code: orderCode,
-                pickup: DEFAULT_PICKUP.label,
-                items: itemCount
-              })}
-              size={132}
-              color={colors.ink}
-              backgroundColor={colors.card}
-            />
-          </View>
+          <Text style={styles.passCodeLabel}>Show this code at pickup</Text>
           <Text style={styles.orderCode}>{orderCode}</Text>
           <View style={styles.passMeta}>
             <PassCol label="When" value={DEFAULT_PICKUP.window} />
@@ -121,14 +112,52 @@ function createOrderCode(confirmedAt: string): string {
 const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.forest,
-    borderRadius: 8,
+    borderRadius: 22,
     gap: spacing.sm,
-    padding: spacing.xl
+    overflow: "hidden",
+    padding: spacing.xl,
+    paddingRight: 104,
+    position: "relative"
+  },
+  heroMascot: {
+    position: "absolute",
+    right: spacing.lg,
+    top: spacing.lg
+  },
+  heroEyebrow: {
+    color: colors.lime,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+    textTransform: "uppercase"
+  },
+  checkBadge: {
+    alignItems: "center",
+    backgroundColor: colors.lime,
+    borderRadius: 19,
+    height: 38,
+    justifyContent: "center",
+    marginTop: spacing.xs,
+    width: 38
   },
   check: {
-    color: colors.lime,
-    fontSize: 44,
-    fontWeight: "900"
+    color: colors.forest,
+    fontSize: 24,
+    fontWeight: "900",
+    lineHeight: 28
+  },
+  heroTitle: {
+    color: colors.cream,
+    fontSize: 25,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+    lineHeight: 30
+  },
+  heroBody: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 21
   },
   card: {
     backgroundColor: colors.card,
@@ -169,19 +198,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: spacing.xl
   },
-  qrBox: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: spacing.md
+  passCodeLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.66,
+    textAlign: "center",
+    textTransform: "uppercase"
   },
   orderCode: {
     color: colors.ink,
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: 2,
-    marginTop: spacing.lg
+    fontFamily: "monospace",
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: 3.1,
+    marginTop: spacing.sm,
+    textAlign: "center"
   },
   passMeta: {
     borderTopColor: colors.border,
