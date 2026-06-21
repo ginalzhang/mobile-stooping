@@ -20,7 +20,7 @@ import stoopySadBody from "../../assets/brand/stoopy-sad-body.png";
 import stoopySadTearLeft from "../../assets/brand/stoopy-sad-tear-left.png";
 import stoopySadTearRight from "../../assets/brand/stoopy-sad-tear-right.png";
 import { colors } from "../theme/colors";
-import { spacing } from "../theme/theme";
+import { radii, spacing } from "../theme/theme";
 
 export type StoopyMood = "happy" | "sad";
 
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     backgroundColor: "transparent",
     borderColor: "transparent",
-    borderRadius: 8,
+    borderRadius: radii.inner,
     borderWidth: 0,
     gap: spacing.xs,
     padding: 0

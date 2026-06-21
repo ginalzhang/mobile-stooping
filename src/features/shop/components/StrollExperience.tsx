@@ -20,7 +20,7 @@ import Svg, {
 } from "react-native-svg";
 
 import { colors } from "../../../theme/colors";
-import { spacing, typography } from "../../../theme/theme";
+import { radii, spacing, typography } from "../../../theme/theme";
 
 export type StrollMood = "walk" | "wave" | "cheer";
 export type SpeechTone = "neutral" | "skip" | "cheer";
@@ -674,7 +674,7 @@ const styles = StyleSheet.create({
   goalWrap: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radii.card,
     borderWidth: 1,
     flexShrink: 0,
     gap: spacing.sm,
@@ -706,14 +706,14 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     backgroundColor: colors.paper2,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     flex: 1,
     height: 12,
     overflow: "hidden"
   },
   progressFill: {
     backgroundColor: colors.lime,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: "100%"
   },
   progressCount: {
@@ -727,7 +727,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: accent.goldBg,
     borderColor: accent.gold,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 1.5,
     flexDirection: "row",
     gap: spacing.xs,
@@ -741,7 +741,7 @@ const styles = StyleSheet.create({
   },
   scene: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radii.inner,
     borderWidth: 1,
     flexShrink: 0,
     height: 112,
@@ -761,7 +761,7 @@ const styles = StyleSheet.create({
   },
   sun: {
     backgroundColor: "#FFD84D",
-    borderRadius: 15,
+    borderRadius: radii.pill,
     height: 30,
     position: "absolute",
     right: spacing.lg,
@@ -785,7 +785,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     backgroundColor: colors.card,
     borderColor: colors.forest,
-    borderRadius: 8,
+    borderRadius: radii.inner,
     borderWidth: 2,
     maxWidth: 210,
     paddingHorizontal: spacing.sm,
@@ -855,7 +855,7 @@ const styles = StyleSheet.create({
   dailyCard: {
     alignItems: "center",
     backgroundColor: colors.card,
-    borderRadius: 8,
+    borderRadius: radii.card,
     gap: spacing.sm,
     maxWidth: 330,
     padding: spacing.xl,
@@ -883,7 +883,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: accent.goldBg,
     borderColor: accent.gold,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 2,
     flexDirection: "row",
     gap: spacing.sm,
@@ -900,7 +900,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "stretch",
     backgroundColor: colors.forest,
-    borderRadius: 8,
+    borderRadius: radii.button,
     minHeight: 48,
     justifyContent: "center",
     paddingHorizontal: spacing.lg,

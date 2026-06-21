@@ -12,8 +12,10 @@ export const spacing = {
 };
 
 export const radii = {
-  sm: 6,
-  md: 8
+  card: 20,
+  inner: 12,
+  button: 14,
+  pill: 999
 };
 
 export const typography = StyleSheet.create({

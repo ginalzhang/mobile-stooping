@@ -8,7 +8,7 @@ import { StateView } from "../../components/StateView";
 import { StoopyMascot } from "../../components/StoopyMascot";
 import { DEFAULT_PICKUP } from "../../constants/pickup";
 import { colors } from "../../theme/colors";
-import { spacing, typography } from "../../theme/theme";
+import { radii, spacing, typography } from "../../theme/theme";
 import type { OrderStackParamList } from "../../navigation/types";
 import { NotificationPanel } from "../notifications/NotificationPanel";
 import { useCart } from "./CartContext";
@@ -121,7 +121,7 @@ function PassCol({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.forest,
-    borderRadius: 22,
+    borderRadius: radii.card,
     gap: spacing.sm,
     overflow: "hidden",
     padding: spacing.xl,
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   checkBadge: {
     alignItems: "center",
     backgroundColor: colors.lime,
-    borderRadius: 19,
+    borderRadius: radii.pill,
     height: 38,
     justifyContent: "center",
     marginTop: spacing.xs,
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radii.card,
     borderWidth: 1,
     gap: spacing.sm,
     marginTop: spacing.lg,
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   pass: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radii.card,
     borderWidth: 1,
     marginTop: spacing.lg,
     overflow: "hidden"

@@ -11,6 +11,7 @@ import { ConfirmationScreen } from "../features/cart/ConfirmationScreen";
 import { ProductDetailScreen } from "../features/product/ProductDetailScreen";
 import { ShopScreen } from "../features/shop/ShopScreen";
 import { colors } from "../theme/colors";
+import { radii } from "../theme/theme";
 import type {
   AboutStackParamList,
   OrderStackParamList,
@@ -190,7 +191,7 @@ const styles = StyleSheet.create({
   badge: {
     alignItems: "center",
     backgroundColor: colors.rust,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: 18,
     justifyContent: "center",
     minWidth: 18,

@@ -30,7 +30,7 @@ import { ORDER_LIMIT } from "../../constants/pickup";
 import { useCart } from "../cart/CartContext";
 import type { ShopStackParamList } from "../../navigation/types";
 import { colors } from "../../theme/colors";
-import { spacing, typography } from "../../theme/theme";
+import { radii, spacing, typography } from "../../theme/theme";
 import type { Product } from "../../types/product";
 import {
   DailyCompleteOverlay,
@@ -880,13 +880,13 @@ const styles = StyleSheet.create({
   },
   segment: {
     backgroundColor: colors.paper2,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     flexDirection: "row",
     padding: spacing.xs
   },
   segmentOption: {
     alignItems: "center",
-    borderRadius: 999,
+    borderRadius: radii.pill,
     flex: 1,
     justifyContent: "center",
     minHeight: 40
@@ -918,7 +918,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radii.inner,
     borderWidth: 1,
     flexDirection: "row",
     minHeight: 48,
@@ -945,7 +945,7 @@ const styles = StyleSheet.create({
   offlinePill: {
     backgroundColor: colors.dangerBg,
     borderColor: colors.danger,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs
@@ -1062,7 +1062,7 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: 16,
+    borderRadius: radii.card,
     borderWidth: 1,
     elevation: 2,
     flex: 1,
@@ -1090,7 +1090,7 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     aspectRatio: 1.25,
     backgroundColor: colors.paper2,
-    borderRadius: 8,
+    borderRadius: radii.inner,
     flexShrink: 1,
     minHeight: 0,
     overflow: "hidden",
@@ -1133,7 +1133,7 @@ const styles = StyleSheet.create({
   speechBubble: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radii.inner,
     borderWidth: 1,
     flex: 1,
     padding: spacing.md
@@ -1157,7 +1157,7 @@ const styles = StyleSheet.create({
   },
   pricePill: {
     backgroundColor: colors.forest,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs
   },
@@ -1168,7 +1168,7 @@ const styles = StyleSheet.create({
   },
   categoryPill: {
     backgroundColor: colors.paper2,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     maxWidth: "48%",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs
@@ -1180,7 +1180,7 @@ const styles = StyleSheet.create({
   },
   stockPill: {
     backgroundColor: colors.lime,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs
   },

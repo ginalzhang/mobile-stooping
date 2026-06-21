@@ -3,7 +3,7 @@ import Svg, { Circle, Path } from "react-native-svg";
 
 import { ORDER_LIMIT } from "../constants/pickup";
 import { colors } from "../theme/colors";
-import { spacing } from "../theme/theme";
+import { radii, spacing } from "../theme/theme";
 
 type OrderFullButtonProps = {
   onPress: () => void;
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E4E0D4",
     borderBottomColor: "#CFC9B8",
     borderBottomWidth: 4,
-    borderRadius: 16,
+    borderRadius: radii.button,
     gap: 2,
     justifyContent: "center",
     minHeight: 48,
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   toast: {
     alignItems: "center",
     backgroundColor: "#23211C",
-    borderRadius: 16,
+    borderRadius: radii.card,
     elevation: 7,
     flexDirection: "row",
     gap: spacing.sm,
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   toastIcon: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: 30,
     justifyContent: "center",
     width: 30
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   },
   toastAction: {
     backgroundColor: "#58CC02",
-    borderRadius: 10,
+    borderRadius: radii.button,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm
   },
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#FBEFCF",
     borderColor: "#FFC800",
-    borderRadius: 12,
+    borderRadius: radii.inner,
     borderWidth: 1.5,
     flexDirection: "row",
     gap: spacing.sm,

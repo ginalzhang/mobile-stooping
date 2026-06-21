@@ -10,7 +10,7 @@ import { DEFAULT_PICKUP } from "../../constants/pickup";
 import { useCart } from "../cart/CartContext";
 import type { ShopStackParamList } from "../../navigation/types";
 import { colors } from "../../theme/colors";
-import { spacing, typography } from "../../theme/theme";
+import { radii, spacing, typography } from "../../theme/theme";
 
 type Props = NativeStackScreenProps<ShopStackParamList, "ProductDetail">;
 
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   heroImage: {
     aspectRatio: 1,
     backgroundColor: colors.paper2,
-    borderRadius: 8,
+    borderRadius: radii.inner,
     marginRight: spacing.md,
     width: 340
   },
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   claimedBadge: {
     alignSelf: "center",
     backgroundColor: colors.card,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     left: 0,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   },
   detailPill: {
     backgroundColor: colors.paper2,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs
   },
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   backButton: {
     alignItems: "center",
     backgroundColor: colors.card,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: 44,
     justifyContent: "center",
     left: spacing.md,

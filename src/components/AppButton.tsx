@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { colors } from "../theme/colors";
+import { radii } from "../theme/theme";
 
 type AppButtonProps = Omit<PressableProps, "style"> & {
   label: string;
@@ -60,7 +61,7 @@ export function AppButton({
 const styles = StyleSheet.create({
   base: {
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: radii.button,
     minHeight: 48,
     justifyContent: "center",
     paddingHorizontal: 16,

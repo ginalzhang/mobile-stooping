@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "./AppButton";
 import { OrderFullButton } from "./OrderFullNotice";
 import { colors } from "../theme/colors";
-import { spacing, typography } from "../theme/theme";
+import { radii, spacing, typography } from "../theme/theme";
 import type { Product } from "../types/product";
 
 type ProductCardProps = {
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "transparent",
     borderColor: "transparent",
-    borderRadius: 8,
+    borderRadius: radii.card,
     flex: 1,
     overflow: "hidden"
   },
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     aspectRatio: 1,
-    borderRadius: 8,
+    borderRadius: radii.inner,
     overflow: "hidden",
     position: "relative",
     width: "100%"
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   heartBadge: {
     alignItems: "center",
     backgroundColor: colors.card,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: 34,
     justifyContent: "center",
     position: "absolute",
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   badge: {
     alignSelf: "flex-start",
     backgroundColor: colors.lowStockBg,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs
   },

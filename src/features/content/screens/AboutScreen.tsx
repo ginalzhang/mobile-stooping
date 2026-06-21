@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   infoCard: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.card,
     borderWidth: 1,
     gap: spacing.sm,
     padding: spacing.lg
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   statCard: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.card,
     borderWidth: 1,
     flexBasis: "47%",
     flexGrow: 1,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   timeline: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.card,
     borderWidth: 1,
     padding: spacing.lg
   },
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   timelineMarker: {
     alignItems: "center",
     backgroundColor: colors.lime,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: 32,
     justifyContent: "center",
     width: 32
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.card,
     borderWidth: 1,
     flexBasis: "47%",
     flexGrow: 1,
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: "center",
     backgroundColor: colors.forest,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: 44,
     justifyContent: "center",
     width: 44
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   },
   branchCard: {
     backgroundColor: colors.forestDark,
-    borderRadius: radii.md,
+    borderRadius: radii.card,
     gap: spacing.md,
     padding: spacing.xl
   },
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   },
   stepDot: {
     backgroundColor: colors.lime,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: 8,
     width: 8
   },
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
   customerCard: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.card,
     borderWidth: 1,
     overflow: "hidden",
     padding: spacing.lg
