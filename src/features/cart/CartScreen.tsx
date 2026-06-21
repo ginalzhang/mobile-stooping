@@ -17,7 +17,7 @@ import { Screen } from "../../components/Screen";
 import { StoopyMascot } from "../../components/StoopyMascot";
 import { DEFAULT_PICKUP, ORDER_LIMIT } from "../../constants/pickup";
 import { colors } from "../../theme/colors";
-import { spacing, typography } from "../../theme/theme";
+import { radii, spacing, typography } from "../../theme/theme";
 import type { OrderStackParamList } from "../../navigation/types";
 import { useCart } from "./CartContext";
 
@@ -247,6 +247,7 @@ function EmptyOrder({ onBrowse }: { onBrowse: () => void }) {
       <StoopyMascot
         caption=""
         containerStyle={styles.emptyMascot}
+        mood="sad"
         size="medium"
       />
       <Text style={styles.emptyTitle}>Your order is empty</Text>
@@ -285,19 +286,19 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     backgroundColor: colors.paper2,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: 6,
     overflow: "hidden"
   },
   progressFill: {
     backgroundColor: colors.forest,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: "100%"
   },
   items: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radii.card,
     borderWidth: 1,
     padding: spacing.md
   },
@@ -305,14 +306,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomColor: colors.border,
     borderBottomWidth: 1,
-    borderRadius: 8,
+    borderRadius: radii.inner,
     flexDirection: "row",
     gap: spacing.md,
     paddingVertical: spacing.md
   },
   thumb: {
     backgroundColor: colors.paper2,
-    borderRadius: 6,
+    borderRadius: radii.inner,
     height: 62,
     width: 62
   },
@@ -348,7 +349,7 @@ const styles = StyleSheet.create({
   },
   conditionPill: {
     backgroundColor: colors.paper2,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     color: colors.forest,
     fontSize: 12,
     fontWeight: "800",
@@ -359,7 +360,7 @@ const styles = StyleSheet.create({
   remove: {
     alignItems: "center",
     backgroundColor: colors.paper2,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     height: 36,
     justifyContent: "center",
     width: 36
@@ -376,7 +377,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radii.inner,
     borderWidth: 1,
     color: colors.ink,
     fontSize: 16,
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
   policy: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radii.card,
     borderWidth: 1,
     gap: spacing.sm,
     marginVertical: spacing.xl,

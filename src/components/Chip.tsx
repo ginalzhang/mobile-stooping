@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text } from "react-native";
 
 import { colors } from "../theme/colors";
+import { radii } from "../theme/theme";
 
 type ChipProps = {
   label: string;
@@ -27,7 +28,7 @@ const styles = StyleSheet.create({
   chip: {
     backgroundColor: colors.paper2,
     borderColor: colors.border,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 1,
     minHeight: 36,
     justifyContent: "center",

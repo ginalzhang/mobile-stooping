@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.card,
     borderWidth: 1,
     gap: spacing.lg,
     padding: spacing.lg
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   reminders: {
     backgroundColor: colors.cream,
     borderColor: colors.border,
-    borderRadius: radii.sm,
+    borderRadius: radii.inner,
     borderWidth: 1,
     gap: spacing.sm,
     padding: spacing.md
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   statusPill: {
     backgroundColor: colors.cream,
     borderColor: colors.border,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs
