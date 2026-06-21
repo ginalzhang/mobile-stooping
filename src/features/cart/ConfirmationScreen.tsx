@@ -1,4 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import * as WebBrowser from "expo-web-browser";
 import { StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../../components/AppButton";
@@ -30,8 +31,12 @@ export function ConfirmationScreen({ navigation }: Props) {
     );
   }
 
-  const orderCode = createOrderCode(confirmation.confirmedAt);
   const itemCount = confirmation.items.reduce((sum, item) => sum + item.quantity, 0);
+  const openCheckout = () => {
+    if (confirmation.checkoutUrl) {
+      void WebBrowser.openBrowserAsync(confirmation.checkoutUrl);
+    }
+  };
 
   return (
     <Screen>
@@ -59,14 +64,26 @@ export function ConfirmationScreen({ navigation }: Props) {
       <View style={styles.pass}>
         <View style={styles.passHeader}>
           <View>
-            <Text style={styles.passTitle}>Pickup pass</Text>
+            <Text style={styles.passTitle}>Shopify confirmation</Text>
             <Text style={styles.passSubtitle}>Stooping Club Berkeley</Text>
           </View>
           <StoopyMascot caption="" size="small" />
         </View>
         <View style={styles.passBody}>
-          <Text style={styles.passCodeLabel}>Show this code at pickup</Text>
-          <Text style={styles.orderCode}>{orderCode}</Text>
+          <Text style={styles.shopifyLabel}>Use Shopify at pickup</Text>
+          <Text style={styles.shopifyTitle}>Bring your Shopify confirmation</Text>
+          <Text style={styles.shopifyBody}>
+            After checkout, use Shopify's confirmation email or order status page at
+            pickup. Staff can look up the paid order in Shopify by name or email.
+          </Text>
+          {confirmation.checkoutUrl ? (
+            <AppButton
+              label="Open Shopify checkout"
+              onPress={openCheckout}
+              style={styles.checkoutButton}
+              variant="accent"
+            />
+          ) : null}
           <View style={styles.passMeta}>
             <PassCol label="When" value={DEFAULT_PICKUP.window} />
             <PassCol label="Where" value="El Cerrito" />
@@ -99,14 +116,6 @@ function PassCol({ label, value }: { label: string; value: string }) {
       <Text style={styles.passValue}>{value}</Text>
     </View>
   );
-}
-
-function createOrderCode(confirmedAt: string): string {
-  const timestamp = Number.isFinite(Date.parse(confirmedAt))
-    ? Date.parse(confirmedAt)
-    : Date.now();
-
-  return `STOOP-${Math.abs(timestamp).toString(36).slice(-6).toUpperCase()}`;
 }
 
 const styles = StyleSheet.create({
@@ -198,22 +207,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: spacing.xl
   },
-  passCodeLabel: {
+  shopifyLabel: {
     color: colors.muted,
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 0.66,
     textAlign: "center",
     textTransform: "uppercase"
   },
-  orderCode: {
+  shopifyTitle: {
     color: colors.ink,
-    fontFamily: "monospace",
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: "800",
-    letterSpacing: 3.1,
+    lineHeight: 27,
     marginTop: spacing.sm,
     textAlign: "center"
+  },
+  shopifyBody: {
+    color: colors.ink2,
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 21,
+    marginTop: spacing.sm,
+    textAlign: "center"
+  },
+  checkoutButton: {
+    marginTop: spacing.lg,
+    width: "100%"
   },
   passMeta: {
     borderTopColor: colors.border,
