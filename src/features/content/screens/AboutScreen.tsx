@@ -15,11 +15,15 @@ import {
   teamMembers
 } from "../data/aboutContent";
 
-const CONTACT_EMAIL = "hello@stooping.club";
+const BRANCH_DIRECTOR_URL = "https://berkeleystooping.org/pages/branch-director-signup";
+const DONATE_URL = "https://berkeleystooping.org/pages/donate";
 
 export function AboutScreen() {
-  const openEmail = () => {
-    void Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=Stooping Club`);
+  const openBranchDirectorSignup = () => {
+    void Linking.openURL(BRANCH_DIRECTOR_URL);
+  };
+  const openDonate = () => {
+    void Linking.openURL(DONATE_URL);
   };
 
   return (
@@ -113,12 +117,12 @@ export function AboutScreen() {
             <View style={styles.buttonRow}>
               <AppButton
                 label="Become a director"
-                onPress={openEmail}
+                onPress={openBranchDirectorSignup}
                 style={styles.actionButton}
               />
               <AppButton
-                label="Volunteer"
-                onPress={openEmail}
+                label="Donate"
+                onPress={openDonate}
                 variant="secondary"
                 style={styles.actionButton}
               />
