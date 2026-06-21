@@ -90,12 +90,11 @@ export function ShopScreen({ navigation }: Props) {
 
   const filters = useMemo(
     () => ({
-      category: categoryFilter ?? undefined,
       inStockOnly: true,
       search,
       sort: "RECENTLY_ADDED" as const
     }),
-    [categoryFilter, search]
+    [search]
   );
   const productsQuery = useInfiniteQuery({
     queryKey: ["products", filters],
@@ -114,6 +113,13 @@ export function ShopScreen({ navigation }: Props) {
   const availableProducts = useMemo(
     () => products.filter((product) => product.availableForSale && product.stockCount > 0),
     [products]
+  );
+  const gridProducts = useMemo(
+    () =>
+      categoryFilter
+        ? products.filter((product) => product.category === categoryFilter)
+        : products,
+    [categoryFilter, products]
   );
   const collectionGroups = useMemo(() => groupProductsByCategory(products), [products]);
   const strollProduct = useMemo(() => {
@@ -567,7 +573,7 @@ export function ShopScreen({ navigation }: Props) {
   return (
     <Screen scroll={false}>
       <FlatList
-        data={products}
+        data={gridProducts}
         keyExtractor={(item) => item.variantId}
         ListHeaderComponent={header}
         ListEmptyComponent={
