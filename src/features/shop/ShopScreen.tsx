@@ -68,6 +68,7 @@ export function ShopScreen({ navigation }: Props) {
   const { height: windowHeight } = useWindowDimensions();
   const [mode, setMode] = useState<BrowseMode>("Grid");
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [strollQueue, setStrollQueue] = useState<string[]>([]);
   const [strolledIds, setStrolledIds] = useState<string[]>([]);
   const [dailyStrollCount, setDailyStrollCount] = useState(0);
@@ -88,8 +89,13 @@ export function ShopScreen({ navigation }: Props) {
   const { addItem, items, totalQuantity } = useCart();
 
   const filters = useMemo(
-    () => ({ inStockOnly: true, search, sort: "RECENTLY_ADDED" as const }),
-    [search]
+    () => ({
+      category: categoryFilter ?? undefined,
+      inStockOnly: true,
+      search,
+      sort: "RECENTLY_ADDED" as const
+    }),
+    [categoryFilter, search]
   );
   const productsQuery = useInfiniteQuery({
     queryKey: ["products", filters],
@@ -205,6 +211,19 @@ export function ShopScreen({ navigation }: Props) {
       handle: product.handle,
       productId: product.id
     });
+  };
+
+  const handleModeChange = (nextMode: BrowseMode) => {
+    if (nextMode !== "Grid") {
+      setCategoryFilter(null);
+    }
+    setMode(nextMode);
+  };
+
+  const openCollection = (category: string) => {
+    setSearch("");
+    setCategoryFilter(category);
+    setMode("Grid");
   };
 
   const isInOrder = (product: Product) =>
@@ -357,30 +376,46 @@ export function ShopScreen({ navigation }: Props) {
           </Text>
         </>
       ) : null}
-      <ModeSegment mode={mode} onChange={setMode} />
+      <ModeSegment mode={mode} onChange={handleModeChange} />
       {mode !== "Stroll" ? (
-        <View style={styles.searchWrap}>
-          <Text style={styles.searchIcon}>⌕</Text>
-          <TextInput
-            accessibilityLabel="Search inventory"
-            autoCapitalize="none"
-            onChangeText={setSearch}
-            placeholder="Search inventory"
-            placeholderTextColor={colors.muted}
-            style={styles.search}
-            value={search}
-          />
-          {search ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              onPress={() => setSearch("")}
-              style={styles.clearSearch}
-            >
-              <Text style={styles.clearSearchText}>×</Text>
-            </Pressable>
+        <>
+          <View style={styles.searchWrap}>
+            <Text style={styles.searchIcon}>⌕</Text>
+            <TextInput
+              accessibilityLabel="Search inventory"
+              autoCapitalize="none"
+              onChangeText={setSearch}
+              placeholder="Search inventory"
+              placeholderTextColor={colors.muted}
+              style={styles.search}
+              value={search}
+            />
+            {search ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                onPress={() => setSearch("")}
+                style={styles.clearSearch}
+              >
+                <Text style={styles.clearSearchText}>×</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {mode === "Grid" && categoryFilter ? (
+            <View style={styles.activeCategory}>
+              <Text numberOfLines={1} style={styles.activeCategoryText}>
+                {categoryFilter}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setCategoryFilter(null)}
+                style={styles.activeCategoryClear}
+              >
+                <Text style={styles.activeCategoryClearText}>Clear</Text>
+              </Pressable>
+            </View>
           ) : null}
-        </View>
+        </>
       ) : null}
     </View>
   );
@@ -502,6 +537,7 @@ export function ShopScreen({ navigation }: Props) {
                 onAdd={addProduct}
                 onOrderFullPress={showOrderFullToast}
                 onPress={openProduct}
+                onSeeAll={() => openCollection(group.category)}
                 orderFull={orderFull}
                 products={group.products}
                 title={group.category}
@@ -571,6 +607,7 @@ function CollectionShelf({
   onAdd,
   onOrderFullPress,
   onPress,
+  onSeeAll,
   orderFull,
   products,
   title
@@ -579,18 +616,32 @@ function CollectionShelf({
   onAdd: (product: Product) => void;
   onOrderFullPress: () => void;
   onPress: (product: Product) => void;
+  onSeeAll: () => void;
   orderFull: boolean;
   products: Product[];
   title: string;
 }) {
+  const visibleProducts = products.slice(0, 4);
+  const moreCount = Math.max(products.length - visibleProducts.length, 0);
+
   return (
     <View style={styles.shelf}>
       <View style={styles.shelfHeader}>
-        <Text style={styles.shelfTitle}>{title}</Text>
+        <Text numberOfLines={1} style={styles.shelfTitle}>
+          {title}
+        </Text>
         <Text style={styles.shelfCount}>{products.length} finds</Text>
+        <Pressable accessibilityRole="button" onPress={onSeeAll} style={styles.seeAll}>
+          <Text style={styles.seeAllText}>See all ›</Text>
+        </Pressable>
       </View>
-      <View style={styles.shelfGrid}>
-        {products.map((product) => (
+      <ScrollView
+        contentContainerStyle={styles.shelfTrackContent}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.shelfTrack}
+      >
+        {visibleProducts.map((product) => (
           <View key={product.variantId} style={styles.shelfCardSlot}>
             <ProductCard
               inOrder={inOrder(product)}
@@ -599,10 +650,19 @@ function CollectionShelf({
               onPress={() => onPress(product)}
               orderFull={orderFull}
               product={product}
+              variant="rail"
             />
           </View>
         ))}
-      </View>
+        <Pressable accessibilityRole="button" onPress={onSeeAll} style={styles.endcap}>
+          <View style={styles.endcapRing}>
+            <Text style={styles.endcapPlus}>+</Text>
+          </View>
+          <Text style={styles.endcapText}>
+            {moreCount > 0 ? `${moreCount}+ more` : "See all"}
+          </Text>
+        </Pressable>
+      </ScrollView>
     </View>
   );
 }
@@ -861,7 +921,7 @@ function getDisplayStreak(streakState: StrollStreakState) {
 
 const styles = StyleSheet.create({
   list: {
-    padding: spacing.lg,
+    padding: 18,
     paddingBottom: spacing.xxl
   },
   header: {
@@ -923,7 +983,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.card,
     borderColor: colors.border,
-    borderRadius: radii.inner,
+    borderRadius: radii.search,
     borderWidth: 1,
     flexDirection: "row",
     minHeight: 48,
@@ -947,6 +1007,33 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 28
   },
+  activeCategory: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    maxWidth: "100%",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs
+  },
+  activeCategoryText: {
+    color: colors.forest,
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  activeCategoryClear: {
+    paddingVertical: 2
+  },
+  activeCategoryClearText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800"
+  },
   offlinePill: {
     backgroundColor: colors.dangerBg,
     borderColor: colors.danger,
@@ -967,7 +1054,7 @@ const styles = StyleSheet.create({
     padding: spacing.md
   },
   offlineBannerCompact: {
-    marginHorizontal: -spacing.lg,
+    marginHorizontal: -18,
     marginTop: -spacing.md,
     paddingVertical: spacing.sm
   },
@@ -1010,39 +1097,79 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   gridRow: {
-    gap: spacing.md,
-    marginBottom: spacing.md
+    gap: 14,
+    marginBottom: spacing.lg
   },
   shelf: {
-    gap: spacing.md,
+    gap: 0,
     marginBottom: spacing.xl
   },
   shelfHeader: {
-    alignItems: "flex-end",
+    alignItems: "baseline",
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing.md
+    gap: spacing.sm,
+    paddingBottom: 11
   },
   shelfTitle: {
     color: colors.ink,
     flex: 1,
-    fontSize: 20,
-    fontWeight: "900"
+    fontSize: 16.5,
+    fontWeight: "800",
+    letterSpacing: 0
   },
   shelfCount: {
     color: colors.muted,
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  seeAll: {
+    marginLeft: "auto",
+    paddingVertical: 2
+  },
+  seeAllText: {
+    color: colors.forest,
+    fontSize: 12.5,
     fontWeight: "800"
   },
-  shelfGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md
-  },
   shelfCardSlot: {
-    flexBasis: "47%",
-    flexGrow: 1,
-    maxWidth: "48%"
+    width: 138
+  },
+  shelfTrack: {
+    marginHorizontal: -18
+  },
+  shelfTrackContent: {
+    gap: 11,
+    paddingBottom: 2,
+    paddingHorizontal: 18
+  },
+  endcap: {
+    alignItems: "center",
+    flex: 0,
+    gap: 7,
+    justifyContent: "center",
+    width: 96
+  },
+  endcapRing: {
+    alignItems: "center",
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    borderWidth: 1.5,
+    height: 46,
+    justifyContent: "center",
+    width: 46
+  },
+  endcapPlus: {
+    color: colors.forest,
+    fontSize: 24,
+    fontWeight: "800",
+    lineHeight: 28
+  },
+  endcapText: {
+    color: colors.forest,
+    fontSize: 11.5,
+    fontWeight: "800",
+    textAlign: "center"
   },
   loadMore: {
     marginTop: spacing.sm

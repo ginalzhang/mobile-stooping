@@ -7,6 +7,7 @@ export const colors = {
   lime: "#CDE85F",
   limeInk: "#39470F",
   moss: "#5B6B3A",
+  signal: "#C8342B",
   rust: "#C96345",
   ink: "#1A1A17",
   ink2: "#3A382F",
