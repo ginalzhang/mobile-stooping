@@ -321,6 +321,7 @@ export function ShopScreen({ navigation }: Props) {
     setSpeech({ text: pickRandom(RESERVE_LINES), tone: "cheer" });
     setCelebrationKey(Date.now());
     resetMoodLater(1100);
+    return true;
   };
 
   const handleOrderFullPress = () => {
@@ -452,7 +453,11 @@ export function ShopScreen({ navigation }: Props) {
               />
               <StrollActionDock
                 inOrder={isInOrder(strollProduct)}
-                onAdd={() => handleStrollAdd(strollProduct)}
+                onAdd={() => {
+                  if (handleStrollAdd(strollProduct)) {
+                    handleStrollOn(strollProduct);
+                  }
+                }}
                 onNext={() => handleStrollOn(strollProduct)}
                 onOrderFullPress={handleOrderFullPress}
                 orderFull={orderFull}
