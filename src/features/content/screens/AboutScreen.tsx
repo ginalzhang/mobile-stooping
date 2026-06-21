@@ -5,7 +5,6 @@ import { AppButton } from "../../../components/AppButton";
 import { BrandLogo } from "../../../components/BrandLogo";
 import { Screen } from "../../../components/Screen";
 import { StoopyMascot } from "../../../components/StoopyMascot";
-import { DEFAULT_PICKUP } from "../../../constants/pickup";
 import { colors } from "../../../theme/colors";
 import { radii, spacing, typography } from "../../../theme/theme";
 import {
@@ -130,18 +129,6 @@ export function AboutScreen() {
           </View>
         </Section>
 
-        <Section title="Happy customers">
-          <View style={styles.customerCard}>
-            <Text style={styles.quoteMark}>"</Text>
-            <Text style={styles.customerQuote}>
-              Customer stories are coming soon. For now, the best review is a
-              cleaner storage corner and one more useful item back in a home.
-            </Text>
-            <Text style={styles.customerMeta}>
-              Next pickup: {DEFAULT_PICKUP.window} at {DEFAULT_PICKUP.label}
-            </Text>
-          </View>
-        </Section>
       </View>
     </Screen>
   );
@@ -373,28 +360,4 @@ const styles = StyleSheet.create({
   actionButton: {
     width: "100%"
   },
-  customerCard: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    overflow: "hidden",
-    padding: spacing.lg
-  },
-  quoteMark: {
-    color: colors.rust,
-    fontSize: 44,
-    fontWeight: "900",
-    lineHeight: 48
-  },
-  customerQuote: {
-    color: colors.ink,
-    fontSize: 17,
-    fontWeight: "800",
-    lineHeight: 24
-  },
-  customerMeta: {
-    ...typography.caption,
-    marginTop: spacing.md
-  }
 });
