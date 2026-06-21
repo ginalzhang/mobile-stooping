@@ -1,6 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "./AppButton";
+import { OrderFullButton } from "./OrderFullNotice";
 import { colors } from "../theme/colors";
 import { spacing, typography } from "../theme/theme";
 import type { Product } from "../types/product";
@@ -9,7 +10,9 @@ type ProductCardProps = {
   product: Product;
   onPress: () => void;
   onAdd?: () => void;
+  onOrderFullPress?: () => void;
   inOrder?: boolean;
+  orderFull?: boolean;
   wide?: boolean;
 };
 
@@ -17,7 +20,9 @@ export function ProductCard({
   product,
   onPress,
   onAdd,
+  onOrderFullPress,
   inOrder,
+  orderFull,
   wide
 }: ProductCardProps) {
   const image = product.images[0];
@@ -74,13 +79,20 @@ export function ProductCard({
       </Pressable>
       {onAdd ? (
         <View style={styles.actionWrap}>
-          <AppButton
-            disabled={!isAvailable || inOrder}
-            label={!isAvailable ? "Claimed" : inOrder ? "In your order" : "Add to order"}
-            onPress={onAdd}
-            style={styles.addButton}
-            variant={inOrder ? "accent" : "primary"}
-          />
+          {orderFull && !inOrder && isAvailable ? (
+            <OrderFullButton
+              onPress={onOrderFullPress ?? onAdd}
+              style={styles.addButton}
+            />
+          ) : (
+            <AppButton
+              disabled={!isAvailable || inOrder}
+              label={!isAvailable ? "Claimed" : inOrder ? "In your order" : "Add to order"}
+              onPress={onAdd}
+              style={styles.addButton}
+              variant={inOrder ? "accent" : "primary"}
+            />
+          )}
         </View>
       ) : null}
     </View>

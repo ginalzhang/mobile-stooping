@@ -247,6 +247,7 @@ function EmptyOrder({ onBrowse }: { onBrowse: () => void }) {
       <StoopyMascot
         caption=""
         containerStyle={styles.emptyMascot}
+        mood="sad"
         size="medium"
       />
       <Text style={styles.emptyTitle}>Your order is empty</Text>
