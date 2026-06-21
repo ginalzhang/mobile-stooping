@@ -17,7 +17,7 @@ import stoopyHappyBody from "../../assets/brand/stoopy-happy-body.png";
 import stoopyHalo from "../../assets/brand/stoopy-halo.png";
 import stoopySad from "../../assets/brand/stoopy-sad.png";
 import stoopySadBody from "../../assets/brand/stoopy-sad-body.png";
-import stoopyTear from "../../assets/brand/stoopy-tear.png";
+import stoopySadTears from "../../assets/brand/stoopy-sad-tears.png";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/theme";
 
@@ -32,7 +32,6 @@ type StoopyMascotProps = {
 
 const BODY_ASPECT = 771 / 720;
 const HALO_ASPECT = 176 / 600;
-const TEAR_ASPECT = 210 / 140;
 
 const mascotWidths = {
   small: 98,
@@ -74,7 +73,7 @@ function StoopyLayers({
   const [reduceMotion, setReduceMotion] = useState(false);
   const haloSway = useRef(new Animated.Value(0)).current;
   const sadShake = useRef(new Animated.Value(0)).current;
-  const tearDrop = useRef(new Animated.Value(0)).current;
+  const tearFall = useRef(new Animated.Value(0)).current;
   const sad = mood === "sad";
 
   useEffect(() => {
@@ -127,9 +126,9 @@ function StoopyLayers({
   useEffect(() => {
     if (!sad || reduceMotion) {
       sadShake.stopAnimation();
-      tearDrop.stopAnimation();
+      tearFall.stopAnimation();
       sadShake.setValue(0);
-      tearDrop.setValue(0);
+      tearFall.setValue(0);
       return;
     }
 
@@ -165,21 +164,20 @@ function StoopyLayers({
     );
     const tearLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(tearDrop, {
-          duration: 1120,
-          easing: Easing.inOut(Easing.quad),
+        Animated.timing(tearFall, {
+          duration: 1180,
+          easing: Easing.in(Easing.quad),
           toValue: 1,
           useNativeDriver: false
         }),
-        Animated.timing(tearDrop, {
+        Animated.timing(tearFall, {
           duration: 1,
           toValue: 0,
           useNativeDriver: false
         }),
-        Animated.delay(260)
+        Animated.delay(320)
       ])
     );
-
     shakeLoop.start();
     tearLoop.start();
 
@@ -187,9 +185,9 @@ function StoopyLayers({
       shakeLoop.stop();
       tearLoop.stop();
       sadShake.setValue(0);
-      tearDrop.setValue(0);
+      tearFall.setValue(0);
     };
-  }, [reduceMotion, sad, sadShake, tearDrop]);
+  }, [reduceMotion, sad, sadShake, tearFall]);
 
   if (reduceMotion) {
     return (
@@ -205,8 +203,6 @@ function StoopyLayers({
 
   const haloWidth = width * (600 / 720);
   const haloHeight = haloWidth * HALO_ASPECT;
-  const tearWidth = width * 0.06;
-  const tearHeight = tearWidth * TEAR_ASPECT;
   const bodyTranslateX = sadShake.interpolate({
     inputRange: [-1, 0, 1],
     outputRange: [-width * 0.015, 0, width * 0.015]
@@ -223,13 +219,13 @@ function StoopyLayers({
     inputRange: [0, 1],
     outputRange: [0, width * 0.012]
   });
-  const tearTranslateY = tearDrop.interpolate({
+  const tearTranslateY = tearFall.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, height * 0.075]
+    outputRange: [0, height * 0.16]
   });
-  const tearOpacity = tearDrop.interpolate({
-    inputRange: [0, 0.12, 0.78, 1],
-    outputRange: [0.7, 1, 1, 0]
+  const tearOpacity = tearFall.interpolate({
+    inputRange: [0, 0.18, 0.72, 1],
+    outputRange: [1, 1, 0.65, 0]
   });
 
   return (
@@ -270,40 +266,20 @@ function StoopyLayers({
           style={{ height, width }}
         />
         {sad ? (
-          <>
-            <Animated.Image
-              accessibilityIgnoresInvertColors
-              resizeMode="contain"
-              source={stoopyTear}
-              style={[
-                styles.layer,
-                {
-                  height: tearHeight,
-                  left: width * 0.4 - width * 0.03,
-                  opacity: tearOpacity,
-                  top: height * 0.435,
-                  transform: [{ translateY: tearTranslateY }],
-                  width: tearWidth
-                }
-              ]}
-            />
-            <Animated.Image
-              accessibilityIgnoresInvertColors
-              resizeMode="contain"
-              source={stoopyTear}
-              style={[
-                styles.layer,
-                {
-                  height: tearHeight,
-                  left: width * 0.614 - width * 0.03,
-                  opacity: tearOpacity,
-                  top: height * 0.435,
-                  transform: [{ translateY: tearTranslateY }],
-                  width: tearWidth
-                }
-              ]}
-            />
-          </>
+          <Animated.Image
+            accessibilityIgnoresInvertColors
+            resizeMode="contain"
+            source={stoopySadTears}
+            style={[
+              styles.layer,
+              {
+                height,
+                opacity: tearOpacity,
+                transform: [{ translateY: tearTranslateY }],
+                width
+              }
+            ]}
+          />
         ) : null}
       </Animated.View>
     </View>
