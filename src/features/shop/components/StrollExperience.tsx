@@ -357,8 +357,10 @@ function StoopyWalk({
           </G>
           <Circle cx="96" cy="52" fill={accent.mascotHi} opacity="0.5" r="22" />
           <RecycleArrows />
-          <Circle cx="82" cy="116" fill="#101010" r="9" />
-          <Circle cx="142" cy="116" fill="#101010" r="9" />
+          <Ellipse cx="82" cy="116" fill="#201E1A" rx="9" ry="10.5" />
+          <Circle cx="78.5" cy="112" fill="#fff" r="2.6" />
+          <Ellipse cx="142" cy="116" fill="#201E1A" rx="9" ry="10.5" />
+          <Circle cx="138.5" cy="112" fill="#fff" r="2.6" />
           {mood === "cheer" ? (
             <Path d="M 92 133 Q 112 151 132 133 Q 112 144 92 133 Z" fill="#101010" />
           ) : (
