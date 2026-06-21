@@ -1132,12 +1132,15 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   shelfCardSlot: {
+    minHeight: 184,
     width: 138
   },
   shelfTrack: {
-    marginHorizontal: -18
+    marginHorizontal: -18,
+    minHeight: 190
   },
   shelfTrackContent: {
+    alignItems: "flex-start",
     gap: 11,
     paddingBottom: 2,
     paddingHorizontal: 18
@@ -1147,6 +1150,7 @@ const styles = StyleSheet.create({
     flex: 0,
     gap: 7,
     justifyContent: "center",
+    minHeight: 184,
     width: 96
   },
   endcapRing: {

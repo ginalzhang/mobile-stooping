@@ -143,6 +143,8 @@ const styles = StyleSheet.create({
   },
   railCard: {
     flex: 0,
+    minHeight: 184,
+    overflow: "visible",
     width: 138
   },
   pressed: {
@@ -215,7 +217,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     position: "absolute",
     top: 9,
-    borderRadius: radii.pill,
+    borderRadius: radii.pill
   },
   cornerPillText: {
     fontSize: 10,
