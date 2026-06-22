@@ -80,9 +80,6 @@ export function ProductCard({
             <Text style={[styles.cornerPillText, styles.newPillText]}>New</Text>
           </View>
         ) : null}
-        <View style={[styles.heartBadge, styles.nonInteractiveOverlay]}>
-          <Text style={styles.heartText}>♡</Text>
-        </View>
         {onAdd ? (
           <Pressable
             accessibilityLabel={inOrder ? "Already in your order" : `Add ${product.title} to order`}
@@ -193,23 +190,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     position: "absolute",
     right: spacing.sm
-  },
-  heartBadge: {
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.88)",
-    borderRadius: radii.pill,
-    height: 32,
-    justifyContent: "center",
-    position: "absolute",
-    right: 7,
-    top: 7,
-    width: 32
-  },
-  heartText: {
-    color: colors.muted,
-    fontSize: 24,
-    fontWeight: "800",
-    lineHeight: 28
   },
   cornerPill: {
     left: 9,

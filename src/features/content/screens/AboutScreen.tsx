@@ -5,7 +5,6 @@ import { AppButton } from "../../../components/AppButton";
 import { BrandLogo } from "../../../components/BrandLogo";
 import { Screen } from "../../../components/Screen";
 import { StoopyMascot } from "../../../components/StoopyMascot";
-import { DEFAULT_PICKUP } from "../../../constants/pickup";
 import { colors } from "../../../theme/colors";
 import { radii, spacing, typography } from "../../../theme/theme";
 import {
@@ -15,11 +14,15 @@ import {
   teamMembers
 } from "../data/aboutContent";
 
-const CONTACT_EMAIL = "hello@stooping.club";
+const BRANCH_DIRECTOR_URL = "https://berkeleystooping.org/pages/branch-director-signup";
+const DONATE_URL = "https://berkeleystooping.org/pages/donate";
 
 export function AboutScreen() {
-  const openEmail = () => {
-    void Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=Stooping Club`);
+  const openBranchDirectorSignup = () => {
+    void Linking.openURL(BRANCH_DIRECTOR_URL);
+  };
+  const openDonate = () => {
+    void Linking.openURL(DONATE_URL);
   };
 
   return (
@@ -113,12 +116,12 @@ export function AboutScreen() {
             <View style={styles.buttonRow}>
               <AppButton
                 label="Become a director"
-                onPress={openEmail}
+                onPress={openBranchDirectorSignup}
                 style={styles.actionButton}
               />
               <AppButton
-                label="Volunteer"
-                onPress={openEmail}
+                label="Donate"
+                onPress={openDonate}
                 variant="secondary"
                 style={styles.actionButton}
               />
@@ -126,18 +129,6 @@ export function AboutScreen() {
           </View>
         </Section>
 
-        <Section title="Happy customers">
-          <View style={styles.customerCard}>
-            <Text style={styles.quoteMark}>"</Text>
-            <Text style={styles.customerQuote}>
-              Customer stories are coming soon. For now, the best review is a
-              cleaner storage corner and one more useful item back in a home.
-            </Text>
-            <Text style={styles.customerMeta}>
-              Next pickup: {DEFAULT_PICKUP.window} at {DEFAULT_PICKUP.label}
-            </Text>
-          </View>
-        </Section>
       </View>
     </Screen>
   );
@@ -369,28 +360,4 @@ const styles = StyleSheet.create({
   actionButton: {
     width: "100%"
   },
-  customerCard: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    overflow: "hidden",
-    padding: spacing.lg
-  },
-  quoteMark: {
-    color: colors.rust,
-    fontSize: 44,
-    fontWeight: "900",
-    lineHeight: 48
-  },
-  customerQuote: {
-    color: colors.ink,
-    fontSize: 17,
-    fontWeight: "800",
-    lineHeight: 24
-  },
-  customerMeta: {
-    ...typography.caption,
-    marginTop: spacing.md
-  }
 });
